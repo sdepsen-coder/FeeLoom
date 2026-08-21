@@ -10,6 +10,10 @@ from .etsy import active_access_token, get_receipt_payments, get_receipts
 from .models import EtsySyncRun
 
 
+class SyncAlreadyRunning(RuntimeError):
+    pass
+
+
 def etsy_money(value):
     value = value or {}
     divisor = Decimal(str(value.get("divisor") or 100))
@@ -17,7 +21,20 @@ def etsy_money(value):
 
 
 def sync_connection(connection):
-    run = EtsySyncRun.objects.create(connection=connection)
+    with transaction.atomic():
+        connection = type(connection).objects.select_for_update().select_related("shop").get(pk=connection.pk)
+        stale_before = timezone.now() - timedelta(minutes=30)
+        connection.sync_runs.filter(
+            status=EtsySyncRun.Status.RUNNING,
+            started_at__lt=stale_before,
+        ).update(
+            status=EtsySyncRun.Status.FAILED,
+            error_message="The previous sync did not finish.",
+            finished_at=timezone.now(),
+        )
+        if connection.sync_runs.filter(status=EtsySyncRun.Status.RUNNING).exists():
+            raise SyncAlreadyRunning("A sync is already running for this shop.")
+        run = EtsySyncRun.objects.create(connection=connection)
     try:
         access_token = active_access_token(connection)
         since = connection.last_synced_at - timedelta(days=1) if connection.last_synced_at else None

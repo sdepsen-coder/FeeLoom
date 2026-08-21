@@ -2,6 +2,7 @@ import base64
 import hashlib
 import json
 import secrets
+import time
 from datetime import timedelta
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -27,25 +28,34 @@ def api_key_header():
     return f"{settings.ETSY_API_KEY}:{settings.ETSY_SHARED_SECRET}"
 
 
-def request_json(url, *, method="GET", data=None, access_token=""):
+def request_json(url, *, method="GET", data=None, access_token="", retries=3):
     encoded_data = urlencode(data).encode() if data is not None else None
     headers = {"Accept": "application/json", "x-api-key": api_key_header()}
     if encoded_data is not None:
         headers["Content-Type"] = "application/x-www-form-urlencoded"
     if access_token:
         headers["Authorization"] = f"Bearer {access_token}"
-    request = Request(url, data=encoded_data, headers=headers, method=method)
-    try:
-        with urlopen(request, timeout=20) as response:
-            return json.loads(response.read().decode())
-    except HTTPError as exc:
+    for attempt in range(retries + 1):
+        request = Request(url, data=encoded_data, headers=headers, method=method)
         try:
-            detail = json.loads(exc.read().decode()).get("error", "")
-        except (ValueError, UnicodeDecodeError):
-            detail = ""
-        raise EtsyAPIError(detail or f"Etsy returned HTTP {exc.code}.") from exc
-    except (URLError, TimeoutError) as exc:
-        raise EtsyAPIError("Etsy could not be reached. Try again shortly.") from exc
+            with urlopen(request, timeout=20) as response:
+                return json.loads(response.read().decode())
+        except HTTPError as exc:
+            if exc.code in {429, 500, 502, 503, 504} and attempt < retries:
+                retry_after = exc.headers.get("Retry-After", "") if exc.headers else ""
+                delay = int(retry_after) if retry_after.isdigit() else 2**attempt
+                time.sleep(min(delay, 10))
+                continue
+            try:
+                detail = json.loads(exc.read().decode()).get("error", "")
+            except (ValueError, UnicodeDecodeError):
+                detail = ""
+            raise EtsyAPIError(detail or f"Etsy returned HTTP {exc.code}.") from exc
+        except (URLError, TimeoutError) as exc:
+            if attempt < retries:
+                time.sleep(min(2**attempt, 10))
+                continue
+            raise EtsyAPIError("Etsy could not be reached. Try again shortly.") from exc
 
 
 def new_oauth_request(redirect_uri):
@@ -114,14 +124,28 @@ def get_owner_shop(user_id, access_token):
     return request_json(f"{API_ROOT}/users/{user_id}/shops", access_token=access_token)
 
 
-def get_receipts(shop_id, access_token, *, min_last_modified=None, limit=25):
-    params = {"limit": min(limit, 100), "offset": 0, "sort_on": "updated", "sort_order": "desc"}
-    if min_last_modified:
-        params["min_last_modified"] = int(min_last_modified.timestamp())
-    return request_json(
-        f"{API_ROOT}/shops/{shop_id}/receipts?{urlencode(params)}",
-        access_token=access_token,
-    ).get("results", [])
+def get_receipts(shop_id, access_token, *, min_last_modified=None, page_size=100, max_pages=50):
+    receipts = []
+    page_size = min(max(page_size, 1), 100)
+    for page in range(max_pages):
+        params = {
+            "limit": page_size,
+            "offset": page * page_size,
+            "sort_on": "updated",
+            "sort_order": "desc",
+        }
+        if min_last_modified:
+            params["min_last_modified"] = int(min_last_modified.timestamp())
+        payload = request_json(
+            f"{API_ROOT}/shops/{shop_id}/receipts?{urlencode(params)}",
+            access_token=access_token,
+        )
+        page_results = payload.get("results", [])
+        receipts.extend(page_results)
+        total = int(payload.get("count", len(receipts)))
+        if not page_results or len(receipts) >= total or len(page_results) < page_size:
+            return receipts
+    raise EtsyAPIError("The Etsy order history is too large for one sync. Run sync again.")
 
 
 def get_receipt_payments(shop_id, receipt_id, access_token):

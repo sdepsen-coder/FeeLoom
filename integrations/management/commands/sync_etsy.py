@@ -1,4 +1,4 @@
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 
 from integrations.models import EtsyConnection
 from integrations.sync import sync_connection
@@ -27,3 +27,5 @@ class Command(BaseCommand):
                 failed += 1
                 self.stderr.write(f"{connection.shop.name}: {exc}")
         self.stdout.write(self.style.SUCCESS(f"Etsy sync finished: {succeeded} succeeded, {failed} failed"))
+        if failed:
+            raise CommandError(f"{failed} Etsy shop syncs failed.")

@@ -13,7 +13,8 @@ from workspaces.models import Membership, Shop, Workspace
 
 from .crypto import decrypt_token, encrypt_token
 from .models import EtsyConnection, EtsySyncRun
-from .sync import sync_connection
+from .etsy import get_receipts
+from .sync import SyncAlreadyRunning, sync_connection
 from .views import OAUTH_SESSION_KEY
 
 
@@ -157,3 +158,32 @@ class EtsyIntegrationTests(TestCase):
         self.assertEqual(order.marketplace_fees, Decimal("5"))
         self.assertEqual(order.product_cost, Decimal("10"))
         self.assertEqual(order.net_profit, Decimal("35"))
+
+    @patch("integrations.etsy.request_json")
+    def test_receipts_are_loaded_across_all_pages(self, request_json_mock):
+        request_json_mock.side_effect = [
+            {"count": 3, "results": [{"receipt_id": 1}, {"receipt_id": 2}]},
+            {"count": 3, "results": [{"receipt_id": 3}]},
+        ]
+
+        receipts = get_receipts("98765", "token", page_size=2)
+
+        self.assertEqual([receipt["receipt_id"] for receipt in receipts], [1, 2, 3])
+        self.assertIn("offset=0", request_json_mock.call_args_list[0].args[0])
+        self.assertIn("offset=2", request_json_mock.call_args_list[1].args[0])
+
+    def test_overlapping_sync_is_rejected(self):
+        connection = EtsyConnection.objects.create(
+            shop=self.shop,
+            etsy_user_id="12345",
+            access_token_ciphertext=encrypt_token("12345.access-secret"),
+            refresh_token_ciphertext=encrypt_token("12345.refresh-secret"),
+            token_expires_at=timezone.now() + timedelta(hours=1),
+            scopes="shops_r transactions_r",
+        )
+        EtsySyncRun.objects.create(connection=connection)
+
+        with self.assertRaises(SyncAlreadyRunning):
+            sync_connection(connection)
+
+        self.assertEqual(connection.sync_runs.count(), 1)

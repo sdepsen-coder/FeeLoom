@@ -18,6 +18,7 @@
             <a class="{% if request.resolver_match.url_name == 'import_sales' %}active{% endif %}" href="{% url 'import_sales' %}">Import</a>
             <a class="{% if request.resolver_match.url_name == 'product_costs' %}active{% endif %}" href="{% url 'product_costs' %}">Product costs</a>
             <a class="{% if request.resolver_match.url_name == 'shops' %}active{% endif %}" href="{% url 'shops' %}">Shops</a>
+            <a class="{% if request.resolver_match.url_name == 'feedback' %}active{% endif %}" href="{% url 'feedback' %}?from={{ request.path|urlencode }}">Feedback</a>
           </nav>
           <div class="sidebar-footer"><span>{{ request.user.username }}</span><form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="text-button" type="submit">Sign out</button></form></div>
         {% endif %}

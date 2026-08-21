@@ -14,7 +14,7 @@ from sales.models import ImportBatch, Order, ProductCost
 from workspaces.models import Membership, Shop
 from workspaces.selectors import ACTIVE_SHOP_SESSION_KEY, ALL_SHOPS_VALUE, shop_selection
 
-from .forms import EtsyCSVImportForm, ProductCostForm, ShopForm
+from .forms import EtsyCSVImportForm, FeedbackForm, ProductCostForm, ShopForm
 
 
 def money(value):
@@ -242,3 +242,22 @@ def toggle_shop(request, shop_id):
     if str(request.session.get(ACTIVE_SHOP_SESSION_KEY)) == str(shop.id) and not shop.is_active:
         request.session[ACTIVE_SHOP_SESSION_KEY] = ALL_SHOPS_VALUE
     return redirect("shops")
+
+
+@login_required
+def feedback(request):
+    context = workspace_context(request)
+    if not context["membership"]:
+        raise PermissionDenied
+    source_page = request.GET.get("from", "")[:500]
+    initial = {"page_path": source_page}
+    form = FeedbackForm(request.POST or None, initial=initial)
+    if request.method == "POST" and form.is_valid():
+        submission = form.save(commit=False)
+        submission.workspace = context["membership"].workspace
+        submission.shop = context["shop"]
+        submission.user = request.user
+        submission.save()
+        return redirect(f"{reverse('feedback')}?sent=1")
+    context.update({"form": form, "feedback_sent": request.GET.get("sent") == "1"})
+    return render(request, "dashboard/feedback.html", context)

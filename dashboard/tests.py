@@ -10,6 +10,8 @@ from sales.models import ImportBatch, Order, OrderItem, ProductCost
 from workspaces.models import Membership, Shop, Workspace
 from workspaces.selectors import ACTIVE_SHOP_SESSION_KEY, ALL_SHOPS_VALUE
 
+from .models import Feedback
+
 
 class DashboardTests(TestCase):
     def setUp(self):
@@ -247,3 +249,38 @@ class DashboardTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Order.objects.filter(external_order_id="PRIVATE-1").exists())
+
+    def test_feedback_is_saved_to_current_workspace_and_shop(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("feedback"),
+            {
+                "category": Feedback.Category.CALCULATION,
+                "rating": 4,
+                "message": "The fee total needs a clearer breakdown.",
+                "page_path": "/sales/1/",
+            },
+        )
+
+        submission = Feedback.objects.get()
+        self.assertRedirects(response, f"{reverse('feedback')}?sent=1")
+        self.assertEqual(submission.workspace, self.workspace)
+        self.assertEqual(submission.shop, self.shop)
+        self.assertEqual(submission.user, self.user)
+        self.assertEqual(submission.page_path, "/sales/1/")
+
+    def test_feedback_rejects_external_source_url(self):
+        self.client.force_login(self.user)
+
+        self.client.post(
+            reverse("feedback"),
+            {
+                "category": Feedback.Category.BUG,
+                "rating": 2,
+                "message": "Something did not work.",
+                "page_path": "https://malicious.example/",
+            },
+        )
+
+        self.assertEqual(Feedback.objects.get().page_path, "")

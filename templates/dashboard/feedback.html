@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Feedback | FeeLoom{% endblock %}
+{% block content %}
+  <header class="page-heading"><div><p class="eyebrow">BETA FEEDBACK</p><h1>Help shape FeeLoom</h1></div></header>
+  <div class="feedback-layout">
+    <section class="form-panel feedback-panel">
+      {% if feedback_sent %}
+        <div class="feedback-thanks"><strong>Thank you.</strong><p>Your feedback has been saved for review.</p><a class="primary-button" href="{% url 'dashboard' %}">Back to overview</a></div>
+      {% else %}
+        <h2>Share your experience</h2>
+        <form method="post" class="stack-form">{% csrf_token %}{{ form.as_p }}<button class="primary-button" type="submit">Send feedback</button></form>
+        <p class="legal-note">Do not include buyer names, addresses, email addresses, or payment details. An Etsy order number is enough when reporting a calculation.</p>
+      {% endif %}
+    </section>
+  </div>
+{% endblock %}

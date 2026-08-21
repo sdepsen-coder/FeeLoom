@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import dashboard, export_sales, import_sales, product_costs, sale_detail, sales_table, shops, switch_shop, toggle_shop
+from .views import dashboard, export_sales, feedback, import_sales, product_costs, sale_detail, sales_table, shops, switch_shop, toggle_shop
 
 
 urlpatterns = [
@@ -13,4 +13,5 @@ urlpatterns = [
     path("shops/", shops, name="shops"),
     path("shops/switch/", switch_shop, name="switch_shop"),
     path("shops/<int:shop_id>/toggle/", toggle_shop, name="toggle_shop"),
+    path("feedback/", feedback, name="feedback"),
 ]

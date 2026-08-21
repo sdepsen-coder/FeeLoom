@@ -3,6 +3,8 @@ from django import forms
 from sales.models import ProductCost
 from workspaces.models import Shop
 
+from .models import Feedback
+
 
 class EtsyCSVImportForm(forms.Form):
     shop = forms.ModelChoiceField(queryset=Shop.objects.none(), label="Shop")
@@ -42,3 +44,23 @@ class ShopForm(forms.ModelForm):
 
     def clean_currency(self):
         return self.cleaned_data["currency"].strip().upper()
+
+
+class FeedbackForm(forms.ModelForm):
+    class Meta:
+        model = Feedback
+        fields = ("category", "rating", "message", "page_path")
+        labels = {"rating": "How useful is FeeLoom?", "message": "Tell us what happened"}
+        widgets = {
+            "message": forms.Textarea(
+                attrs={
+                    "rows": 6,
+                    "placeholder": "What did you expect, and what happened instead?",
+                }
+            ),
+            "page_path": forms.HiddenInput(),
+        }
+
+    def clean_page_path(self):
+        page_path = self.cleaned_data.get("page_path", "").strip()
+        return page_path if page_path.startswith("/") and not page_path.startswith("//") else ""

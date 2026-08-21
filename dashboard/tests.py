@@ -51,6 +51,12 @@ class DashboardTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse("login"), response["Location"])
 
+    def test_health_check_is_public_and_checks_database(self):
+        response = self.client.get(reverse("health_check"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "ok"})
+
     def test_dashboard_and_sales_show_current_shop_data(self):
         self.client.force_login(self.user)
 

@@ -36,6 +36,9 @@ ALLOWED_HOSTS = [
     for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
     if host.strip()
 ]
+RENDER_EXTERNAL_HOSTNAME = os.environ.get("RENDER_EXTERNAL_HOSTNAME", "").strip()
+if RENDER_EXTERNAL_HOSTNAME and RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 
 
 # Application definition
@@ -144,6 +147,10 @@ CSRF_TRUSTED_ORIGINS = [
     for origin in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")
     if origin.strip()
 ]
+if RENDER_EXTERNAL_HOSTNAME:
+    render_origin = f"https://{RENDER_EXTERNAL_HOSTNAME}"
+    if render_origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(render_origin)
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = not DEBUG
@@ -160,4 +167,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 ETSY_API_KEY = os.environ.get("ETSY_API_KEY", "")
 ETSY_SHARED_SECRET = os.environ.get("ETSY_SHARED_SECRET", "")
 ETSY_REDIRECT_URI = os.environ.get("ETSY_REDIRECT_URI", "")
+if not ETSY_REDIRECT_URI and RENDER_EXTERNAL_HOSTNAME:
+    ETSY_REDIRECT_URI = f"https://{RENDER_EXTERNAL_HOSTNAME}/integrations/etsy/callback/"
 FEELOOM_TOKEN_ENCRYPTION_KEY = os.environ.get("FEELOOM_TOKEN_ENCRYPTION_KEY", "")

@@ -28,3 +28,10 @@ FeeLoom requests read-only `shops_r` and `transactions_r` scopes. Owners and man
 can then connect each shop and run an incremental order sync from the Shops page.
 
 For scheduled syncing, run `python manage.py sync_etsy` from the platform scheduler.
+
+## Render preview
+
+The Blueprint provisions a free web service and free PostgreSQL database. Render
+supplies the public hostname automatically, and `/health/` verifies both Django and
+the database. Free PostgreSQL is preview-only and expires after 30 days; use a paid
+database before storing real seller data.

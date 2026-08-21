@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Sign in | FeeLoom{% endblock %}
+{% block content %}
+  <section class="auth-panel">
+    <p class="eyebrow">WELCOME BACK</p><h1>Sign in to FeeLoom</h1>
+    <form method="post" class="stack-form">{% csrf_token %}{{ form.as_p }}{% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}<button class="primary-button" type="submit">Sign in</button></form>
+    <p class="form-note">New to FeeLoom? <a href="{% url 'signup' %}">Create an account</a></p>
+  </section>
+{% endblock %}

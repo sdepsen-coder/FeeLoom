@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Overview | FeeLoom{% endblock %}
+{% block topbar_actions %}<a class="primary-button compact" href="{% url 'sales_table' %}">View sales</a>{% endblock %}
+{% block content %}
+  <header class="page-heading"><div><p class="eyebrow">PROFIT OVERVIEW</p><h1>Know what every sale keeps.</h1></div></header>
+  <section class="metric-grid" aria-label="Profit summary">
+    <article class="metric"><span>Gross sales</span><strong>{{ shop.currency|default:"USD" }} {{ gross_sales|floatformat:2 }}</strong></article>
+    <article class="metric"><span>Etsy fees</span><strong>{{ shop.currency|default:"USD" }} {{ total_fees|floatformat:2 }}</strong></article>
+    <article class="metric emphasis"><span>Net profit</span><strong>{{ shop.currency|default:"USD" }} {{ net_profit|floatformat:2 }}</strong></article>
+    <article class="metric"><span>Net margin</span><strong>{{ margin|floatformat:1 }}%</strong></article>
+  </section>
+  <section class="section-heading"><div><h2>Recent sales</h2><p>{{ loss_count }} orders currently at a loss</p></div><a href="{% url 'sales_table' %}">View all</a></section>
+  {% include "dashboard/order_table.html" with orders=recent_orders %}
+{% endblock %}

@@ -1,0 +1,24 @@
+databases:
+  - name: feeloom-postgres
+    plan: free
+
+services:
+  - type: web
+    name: feeloom-web
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    startCommand: python manage.py migrate && gunicorn config.wsgi:application
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: feeloom-postgres
+          property: connectionString
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: false
+      - key: DJANGO_ALLOWED_HOSTS
+        value: feeloom-web.onrender.com
+      - key: DJANGO_CSRF_TRUSTED_ORIGINS
+        value: https://feeloom-web.onrender.com

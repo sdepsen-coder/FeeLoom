@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Create account | FeeLoom{% endblock %}
+{% block content %}
+  <section class="auth-panel wide">
+    <p class="eyebrow">START YOUR WORKSPACE</p><h1>Create your FeeLoom account</h1>
+    <form method="post" class="stack-form">{% csrf_token %}{{ form.as_p }}<button class="primary-button" type="submit">Create account</button></form>
+    <p class="form-note">Already have an account? <a href="{% url 'login' %}">Sign in</a></p>
+  </section>
+{% endblock %}

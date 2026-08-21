@@ -38,6 +38,10 @@ first use.
 
 Public authentication endpoints use cache-backed fixed-window rate limits for
 login failures, signup attempts, password resets, and verification email requests.
+
+Every response includes an `X-Request-ID`, and critical workspace actions appear
+on the owner-only Activity page. Set `SENTRY_DSN` to enable optional error
+reporting; personal information and performance tracing are disabled by default.
 FeeLoom requests read-only `shops_r` and `transactions_r` scopes. Owners and managers
 can then connect each shop and run an incremental order sync from the Shops page.
 

@@ -15,6 +15,7 @@ import hashlib
 
 from workspaces.models import Membership, Shop, Workspace
 from workspaces.selectors import ACTIVE_SHOP_SESSION_KEY
+from dashboard.audit import record_audit
 
 from .forms import ResendVerificationForm, SignupForm
 from .models import BetaInvite, LegalAcceptance
@@ -143,6 +144,14 @@ def signup(request):
             )
             invite.use_count += 1
             invite.save(update_fields=["use_count"])
+            record_audit(
+                request,
+                workspace=workspace,
+                shop=shop,
+                user=user,
+                action="account.created",
+                summary="Owner account and workspace created",
+            )
             if settings.EMAIL_VERIFICATION_REQUIRED:
                 send_verification_email(request, user)
         if settings.EMAIL_VERIFICATION_REQUIRED:

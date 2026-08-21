@@ -9,6 +9,7 @@ from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.serializers.json import DjangoJSONEncoder
+from django.core.paginator import Paginator
 from django.db.models import Q, Sum
 from django.http import FileResponse, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -25,7 +26,8 @@ from workspaces.models import Membership, Shop
 from workspaces.selectors import ACTIVE_SHOP_SESSION_KEY, ALL_SHOPS_VALUE, shop_selection
 
 from .forms import DeleteWorkspaceForm, EtsyCSVImportForm, FeedbackForm, ProductCostForm, ShopForm
-from .models import Feedback
+from .models import AuditEvent, Feedback
+from .audit import record_audit
 
 
 def money(value):
@@ -143,6 +145,14 @@ def export_sales(request):
     orders, _, _ = filtered_sales(request, context)
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = 'attachment; filename="feeloom-sales.csv"'
+    if context["membership"]:
+        record_audit(
+            request,
+            workspace=context["membership"].workspace,
+            shop=context["shop"],
+            action="sales.exported",
+            summary="Sales CSV downloaded",
+        )
     writer = csv.writer(response)
     writer.writerow(
         ["Shop", "Order date", "Order ID", "Gross sales", "Marketplace fees", "Ad fees", "Shipping cost", "Product cost", "Net profit", "Margin percent", "Currency", "Status"]
@@ -177,6 +187,13 @@ def product_costs(request):
                 sku=form.cleaned_data["sku"].strip().upper(),
                 defaults={field: form.cleaned_data[field] for field in ("title", "materials", "packaging", "labor", "overhead")},
             )
+            record_audit(
+                request,
+                workspace=context["membership"].workspace,
+                shop=shop,
+                action="product_cost.saved",
+                summary="Product cost saved",
+            )
             return redirect(f"{request.path}?saved={cost.id}")
     costs = (
         ProductCost.objects.filter(shop__in=context["shops"]).select_related("shop")
@@ -200,6 +217,17 @@ def import_sales(request):
     if request.method == "POST" and form.is_valid():
         try:
             batch, _ = import_etsy_orders(form.cleaned_data["shop"], form.cleaned_data["csv_file"])
+            record_audit(
+                request,
+                workspace=context["membership"].workspace,
+                shop=form.cleaned_data["shop"],
+                action="sales.imported",
+                summary="Sales CSV imported",
+                metadata={
+                    "imported_rows": batch.imported_rows,
+                    "skipped_rows": batch.skipped_rows,
+                },
+            )
             return redirect(f"{request.path}?batch={batch.id}")
         except CSVImportError as exc:
             import_error = str(exc)
@@ -235,6 +263,13 @@ def shops(request):
             shop = form.save(commit=False)
             shop.workspace = context["membership"].workspace
             shop.save()
+            record_audit(
+                request,
+                workspace=shop.workspace,
+                shop=shop,
+                action="shop.created",
+                summary="Shop created",
+            )
             request.session[ACTIVE_SHOP_SESSION_KEY] = shop.id
             return redirect("shops")
     context.update(
@@ -259,6 +294,13 @@ def toggle_shop(request, shop_id):
         return redirect("shops")
     shop.is_active = not shop.is_active
     shop.save(update_fields=["is_active"])
+    record_audit(
+        request,
+        workspace=context["membership"].workspace,
+        shop=shop,
+        action="shop.activated" if shop.is_active else "shop.deactivated",
+        summary="Shop status changed",
+    )
     if str(request.session.get(ACTIVE_SHOP_SESSION_KEY)) == str(shop.id) and not shop.is_active:
         request.session[ACTIVE_SHOP_SESSION_KEY] = ALL_SHOPS_VALUE
     return redirect("shops")
@@ -278,6 +320,13 @@ def feedback(request):
         submission.shop = context["shop"]
         submission.user = request.user
         submission.save()
+        record_audit(
+            request,
+            workspace=context["membership"].workspace,
+            shop=context["shop"],
+            action="feedback.submitted",
+            summary="Beta feedback submitted",
+        )
         return redirect(f"{reverse('feedback')}?sent=1")
     context.update({"form": form, "feedback_sent": request.GET.get("sent") == "1"})
     return render(request, "dashboard/feedback.html", context)
@@ -400,7 +449,18 @@ def export_workspace_data(request):
                 "id", "shop_id", "user_id", "category", "rating", "message", "page_path", "status", "created_at"
             )
         ),
+        "audit_events": list(
+            workspace.audit_events.order_by("id").values(
+                "id", "shop_id", "user_id", "action", "summary", "metadata", "request_id", "created_at"
+            )
+        ),
     }
+    record_audit(
+        request,
+        workspace=workspace,
+        action="workspace.exported",
+        summary="Workspace data downloaded",
+    )
     response = HttpResponse(
         json.dumps(payload, cls=DjangoJSONEncoder, indent=2),
         content_type="application/json",
@@ -422,6 +482,12 @@ def delete_workspace(request):
     if not form.is_valid():
         context.update({"can_delete_workspace": True, "delete_form": form})
         return render(request, "dashboard/privacy_data.html", context, status=400)
+    record_audit(
+        request,
+        workspace=workspace,
+        action="workspace.deleted",
+        summary="Workspace permanently deleted",
+    )
     user = request.user
     workspace.delete()
     logout(request)
@@ -443,6 +509,13 @@ def beta_invites(request):
     form = BetaInviteForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         invite = form.save_for(workspace=membership.workspace, user=request.user)
+        record_audit(
+            request,
+            workspace=membership.workspace,
+            action="beta_invite.created",
+            summary="Beta invite created",
+            metadata={"max_uses": invite.max_uses},
+        )
         return redirect(f"{reverse('beta_invites')}?created={invite.id}")
     invites = membership.workspace.beta_invites.select_related("created_by")
     created_id = request.GET.get("created", "")
@@ -467,7 +540,26 @@ def toggle_invite(request, invite_id):
     invite = get_object_or_404(BetaInvite, id=invite_id, workspace=membership.workspace)
     invite.is_active = not invite.is_active
     invite.save(update_fields=["is_active"])
+    record_audit(
+        request,
+        workspace=membership.workspace,
+        action="beta_invite.enabled" if invite.is_active else "beta_invite.disabled",
+        summary="Beta invite status changed",
+    )
     return redirect("beta_invites")
+
+
+@login_required
+def activity(request):
+    context = workspace_context(request)
+    membership = context["membership"]
+    if not is_workspace_owner(request, membership):
+        raise PermissionDenied
+    events = AuditEvent.objects.filter(workspace=membership.workspace).select_related(
+        "shop", "user"
+    )
+    context["activity_page"] = Paginator(events, 25).get_page(request.GET.get("page"))
+    return render(request, "dashboard/activity.html", context)
 
 
 @login_required

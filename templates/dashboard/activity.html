@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Activity | FeeLoom{% endblock %}
+{% block content %}
+  <header class="page-heading"><div><p class="eyebrow">OPERATIONS</p><h1>Activity</h1></div></header>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Time</th><th>Action</th><th>Shop</th><th>User</th><th>Request ID</th></tr></thead>
+      <tbody>
+        {% for event in activity_page %}<tr><td>{{ event.created_at|date:"M j, Y H:i" }}</td><td><strong>{{ event.summary|default:event.action }}</strong><br><small>{{ event.action }}</small></td><td>{{ event.shop.name|default:"-" }}</td><td>{{ event.user.username|default:"System" }}</td><td><code>{{ event.request_id|default:"-" }}</code></td></tr>{% empty %}<tr><td class="empty-state" colspan="5">No activity recorded yet.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if activity_page.paginator.num_pages > 1 %}<nav class="pagination" aria-label="Activity pages">{% if activity_page.has_previous %}<a class="secondary-button compact" href="?page={{ activity_page.previous_page_number }}">Previous</a>{% endif %}<span>Page {{ activity_page.number }} of {{ activity_page.paginator.num_pages }}</span>{% if activity_page.has_next %}<a class="secondary-button compact" href="?page={{ activity_page.next_page_number }}">Next</a>{% endif %}</nav>{% endif %}
+{% endblock %}

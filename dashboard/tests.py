@@ -13,7 +13,7 @@ from sales.models import ImportBatch, Order, OrderItem, ProductCost
 from workspaces.models import Membership, Shop, Workspace
 from workspaces.selectors import ACTIVE_SHOP_SESSION_KEY, ALL_SHOPS_VALUE
 
-from .models import Feedback
+from .models import AuditEvent, Feedback
 
 
 class DashboardTests(TestCase):
@@ -61,6 +61,10 @@ class DashboardTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"status": "ok"})
+        self.assertRegex(
+            response["X-Request-ID"],
+            r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+        )
 
     def test_dashboard_and_sales_show_current_shop_data(self):
         self.client.force_login(self.user)
@@ -432,11 +436,21 @@ class DashboardTests(TestCase):
         self.assertRedirects(response, f"{reverse('beta_invites')}?created={invite.id}")
         self.assertEqual(invite.max_uses, 2)
         self.assertTrue(invite.is_available)
+        created_event = AuditEvent.objects.get(action="beta_invite.created")
+        self.assertEqual(created_event.workspace, self.workspace)
+        self.assertEqual(created_event.user, self.user)
+        self.assertTrue(created_event.request_id)
 
         toggle_response = self.client.post(reverse("toggle_invite", args=[invite.id]))
         invite.refresh_from_db()
         self.assertRedirects(toggle_response, reverse("beta_invites"))
         self.assertFalse(invite.is_active)
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                workspace=self.workspace,
+                action="beta_invite.disabled",
+            ).exists()
+        )
 
     def test_manager_cannot_manage_beta_invites(self):
         manager = User.objects.create_user(username="invite-manager")
@@ -452,10 +466,40 @@ class DashboardTests(TestCase):
             reverse("beta_invites"),
             {"label": "Unauthorized", "max_uses": 1, "valid_for_days": 7},
         )
+        activity_response = self.client.get(reverse("activity"))
 
         self.assertEqual(list_response.status_code, 403)
         self.assertEqual(create_response.status_code, 403)
+        self.assertEqual(activity_response.status_code, 403)
         self.assertFalse(BetaInvite.objects.filter(label="Unauthorized").exists())
+
+    def test_activity_is_owner_only_and_scoped_to_workspace(self):
+        AuditEvent.objects.create(
+            workspace=self.workspace,
+            user=self.user,
+            action="shop.created",
+            summary="Visible activity",
+            request_id="visible-request",
+        )
+        other_user = User.objects.create_user(username="activity-outsider")
+        other_workspace = Workspace.objects.create(
+            name="Activity Outside", slug="activity-outside", owner=other_user
+        )
+        AuditEvent.objects.create(
+            workspace=other_workspace,
+            user=other_user,
+            action="shop.created",
+            summary="Private activity",
+            request_id="private-request",
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("activity"))
+
+        self.assertContains(response, "Visible activity")
+        self.assertContains(response, "visible-request")
+        self.assertNotContains(response, "Private activity")
+        self.assertNotContains(response, "private-request")
 
     def test_owner_cannot_toggle_another_workspace_invite(self):
         other_user = User.objects.create_user(username="invite-outsider")

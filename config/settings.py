@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 
 import dj_database_url
+import sentry_sdk
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -59,6 +60,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'config.middleware.RequestIdMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -206,3 +208,28 @@ SIGNUP_RATE_WINDOW = 3600
 EMAIL_REQUEST_IP_LIMIT = 20
 EMAIL_REQUEST_ADDRESS_LIMIT = 5
 EMAIL_REQUEST_RATE_WINDOW = 3600
+
+SENTRY_DSN = os.environ.get("SENTRY_DSN", "").strip()
+if SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        environment=os.environ.get("SENTRY_ENVIRONMENT", "production"),
+        release=os.environ.get("RENDER_GIT_COMMIT") or None,
+        send_default_pii=False,
+        traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0")),
+    )
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {"request_id": {"()": "config.logging.RequestIdFilter"}},
+    "formatters": {"json": {"()": "config.logging.JsonFormatter"}},
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "filters": ["request_id"],
+            "formatter": "json",
+        }
+    },
+    "root": {"handlers": ["console"], "level": os.environ.get("LOG_LEVEL", "INFO")},
+}

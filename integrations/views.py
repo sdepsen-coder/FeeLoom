@@ -11,6 +11,7 @@ from django.utils import timezone
 
 from workspaces.models import Membership, Shop
 from workspaces.selectors import current_membership
+from dashboard.audit import record_audit
 
 from .crypto import encrypt_token
 from .etsy import EtsyAPIError, exchange_code, get_owner_shop, new_oauth_request
@@ -84,6 +85,14 @@ def etsy_callback(request):
         shop.external_shop_id = str(etsy_shop["shop_id"])
         shop.currency = etsy_shop.get("currency_code") or shop.currency
         shop.save(update_fields=["external_shop_id", "currency"])
+        membership = current_membership(request.user)
+        record_audit(
+            request,
+            workspace=membership.workspace,
+            shop=shop,
+            action="etsy.connected",
+            summary="Etsy shop connected",
+        )
         messages.success(request, f"{shop.name} is connected to Etsy.")
     except (EtsyAPIError, KeyError, ValueError) as exc:
         messages.error(request, f"Etsy connection failed: {exc}")
@@ -102,7 +111,28 @@ def etsy_sync(request, shop_id):
             request,
             f"Etsy sync complete: {run.imported_orders} new, {run.updated_orders} updated.",
         )
+        membership = current_membership(request.user)
+        record_audit(
+            request,
+            workspace=membership.workspace,
+            shop=shop,
+            action="etsy.sync_succeeded",
+            summary="Etsy sync completed",
+            metadata={
+                "imported_orders": run.imported_orders,
+                "updated_orders": run.updated_orders,
+            },
+        )
     except Exception as exc:
+        membership = current_membership(request.user)
+        record_audit(
+            request,
+            workspace=membership.workspace,
+            shop=shop,
+            action="etsy.sync_failed",
+            summary="Etsy sync failed",
+            metadata={"error_type": type(exc).__name__},
+        )
         messages.error(request, f"Etsy sync failed: {exc}")
     return redirect("shops")
 
@@ -115,5 +145,13 @@ def etsy_disconnect(request, shop_id):
     EtsyConnection.objects.filter(shop=shop).delete()
     shop.external_shop_id = ""
     shop.save(update_fields=["external_shop_id"])
+    membership = current_membership(request.user)
+    record_audit(
+        request,
+        workspace=membership.workspace,
+        shop=shop,
+        action="etsy.disconnected",
+        summary="Etsy shop disconnected",
+    )
     messages.success(request, f"{shop.name} was disconnected from Etsy.")
     return redirect("shops")

@@ -1,7 +1,9 @@
 from django.contrib.auth import login
+from django.contrib.auth import views as auth_views
 from django.conf import settings
 from django.db import transaction
 from django.shortcuts import redirect, render
+from django.urls import reverse_lazy
 from django.utils.text import slugify
 
 from workspaces.models import Membership, Shop, Workspace
@@ -9,6 +11,18 @@ from workspaces.selectors import ACTIVE_SHOP_SESSION_KEY
 
 from .forms import SignupForm
 from .models import BetaInvite, LegalAcceptance
+
+
+class FeeLoomPasswordResetView(auth_views.PasswordResetView):
+    template_name = "registration/password_reset_form.html"
+    email_template_name = "registration/password_reset_email.txt"
+    subject_template_name = "registration/password_reset_subject.txt"
+    success_url = reverse_lazy("password_reset_done")
+
+    def dispatch(self, request, *args, **kwargs):
+        if not settings.EMAIL_DELIVERY_ENABLED:
+            return render(request, "registration/password_reset_unavailable.html")
+        return super().dispatch(request, *args, **kwargs)
 
 
 def unique_workspace_slug(name):

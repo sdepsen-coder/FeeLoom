@@ -80,6 +80,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'config.context_processors.product_flags',
             ],
         },
     },
@@ -172,3 +173,26 @@ if not ETSY_REDIRECT_URI and RENDER_EXTERNAL_HOSTNAME:
 FEELOOM_TOKEN_ENCRYPTION_KEY = os.environ.get("FEELOOM_TOKEN_ENCRYPTION_KEY", "")
 FEELOOM_LEGAL_VERSION = "2026-08-21"
 FEELOOM_SUPPORT_EMAIL = os.environ.get("FEELOOM_SUPPORT_EMAIL", "").strip()
+
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "").strip()
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "").strip()
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "true").lower() == "true"
+EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL", "false").lower() == "true"
+EMAIL_TIMEOUT = 10
+CONFIGURED_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "").strip()
+DEFAULT_FROM_EMAIL = CONFIGURED_FROM_EMAIL or "FeeLoom <no-reply@localhost>"
+EMAIL_DELIVERY_ENABLED = DEBUG or bool(
+    EMAIL_HOST and EMAIL_HOST_USER and EMAIL_HOST_PASSWORD and CONFIGURED_FROM_EMAIL
+)
+EMAIL_BACKEND = os.environ.get(
+    "DJANGO_EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend"
+    if DEBUG
+    else (
+        "django.core.mail.backends.smtp.EmailBackend"
+        if EMAIL_DELIVERY_ENABLED
+        else "django.core.mail.backends.dummy.EmailBackend"
+    ),
+)

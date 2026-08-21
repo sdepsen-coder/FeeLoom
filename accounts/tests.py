@@ -1,5 +1,8 @@
+import re
 from django.contrib.auth.models import User
+from django.core import mail
 from django.test import TestCase
+from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from datetime import timedelta
@@ -119,3 +122,53 @@ class SignupTests(TestCase):
         self.assertEqual(terms_response.status_code, 200)
         self.assertContains(privacy_response, "Privacy Policy")
         self.assertContains(terms_response, "Terms of Service")
+
+    @override_settings(
+        EMAIL_DELIVERY_ENABLED=True,
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    )
+    def test_password_reset_sends_email_without_exposing_account_lookup(self):
+        user = User.objects.create_user(
+            username="reset-seller",
+            email="reset@example.com",
+            password="old-password-123",
+        )
+
+        response = self.client.post(
+            reverse("password_reset"), {"email": "reset@example.com"}
+        )
+
+        self.assertRedirects(response, reverse("password_reset_done"))
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("Reset your FeeLoom password", mail.outbox[0].subject)
+        self.assertIn("/accounts/reset/", mail.outbox[0].body)
+        self.assertIn(user.email, mail.outbox[0].to)
+
+        reset_url = re.search(r"http://testserver(\S+)", mail.outbox[0].body).group(1)
+        confirm_response = self.client.get(reset_url)
+        self.assertEqual(confirm_response.status_code, 302)
+        new_password_url = confirm_response["Location"]
+        update_response = self.client.post(
+            new_password_url,
+            {
+                "new_password1": "new-strong-password-456",
+                "new_password2": "new-strong-password-456",
+            },
+        )
+        self.assertRedirects(update_response, reverse("password_reset_complete"))
+        user.refresh_from_db()
+        self.assertTrue(user.check_password("new-strong-password-456"))
+
+        unknown_response = self.client.post(
+            reverse("password_reset"), {"email": "unknown@example.com"}
+        )
+        self.assertRedirects(unknown_response, reverse("password_reset_done"))
+        self.assertEqual(len(mail.outbox), 1)
+
+    @override_settings(EMAIL_DELIVERY_ENABLED=False)
+    def test_password_reset_is_hidden_and_unavailable_without_email_delivery(self):
+        login_response = self.client.get(reverse("login"))
+        reset_response = self.client.get(reverse("password_reset"))
+
+        self.assertNotContains(login_response, "Forgot your password?")
+        self.assertContains(reset_response, "Password reset is not available yet")

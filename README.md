@@ -27,6 +27,10 @@ Set `ETSY_API_KEY`, `ETSY_SHARED_SECRET`, `ETSY_REDIRECT_URI`, and a long random
 
 Public beta legal pages are available at `/privacy/` and `/terms/`. Set
 `FEELOOM_SUPPORT_EMAIL` to publish a support address on both pages.
+
+Password recovery is enabled automatically when `EMAIL_HOST`, `EMAIL_HOST_USER`,
+`EMAIL_HOST_PASSWORD`, and a verified `DEFAULT_FROM_EMAIL` are configured. The
+remaining SMTP settings are listed in `.env.example`.
 FeeLoom requests read-only `shops_r` and `transactions_r` scopes. Owners and managers
 can then connect each shop and run an incremental order sync from the Shops page.
 

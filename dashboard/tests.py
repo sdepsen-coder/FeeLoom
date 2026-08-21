@@ -1,9 +1,18 @@
-from decimal import Decimal
+import sqlite3
+import tempfile
 from datetime import timedelta
+from decimal import Decimal
+from pathlib import Path
+from types import SimpleNamespace
+from unittest import skipUnless
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.core.management.base import CommandError
+from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.db import connection
+from django.test import SimpleTestCase, TestCase, TransactionTestCase
 from django.urls import reverse
 from django.utils import timezone
 
@@ -14,6 +23,7 @@ from workspaces.models import Membership, Shop, Workspace
 from workspaces.selectors import ACTIVE_SHOP_SESSION_KEY, ALL_SHOPS_VALUE
 
 from .models import AuditEvent, Feedback
+from .management.commands.backup_database import Command as BackupDatabaseCommand
 
 
 class DashboardTests(TestCase):
@@ -518,3 +528,68 @@ class DashboardTests(TestCase):
         self.assertEqual(response.status_code, 404)
         outside_invite.refresh_from_db()
         self.assertTrue(outside_invite.is_active)
+
+
+@skipUnless(connection.vendor == "sqlite", "SQLite backup verification")
+class DatabaseBackupCommandTests(TransactionTestCase):
+    def test_backup_database_creates_readable_copy(self):
+        User.objects.create_user(username="backup-owner")
+
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "feeloom.sqlite3"
+
+            call_command("backup_database", output=str(output))
+
+            self.assertTrue(output.exists())
+            backup = sqlite3.connect(output)
+            try:
+                username = backup.execute(
+                    "SELECT username FROM auth_user WHERE username = ?",
+                    ("backup-owner",),
+                ).fetchone()
+            finally:
+                backup.close()
+            self.assertEqual(username, ("backup-owner",))
+
+    def test_backup_database_refuses_to_overwrite_by_default(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "existing.sqlite3"
+            output.write_text("keep", encoding="utf-8")
+
+            with self.assertRaisesMessage(CommandError, "Backup already exists"):
+                call_command("backup_database", output=str(output))
+
+            self.assertEqual(output.read_text(encoding="utf-8"), "keep")
+
+
+class PostgreSQLBackupCommandTests(SimpleTestCase):
+    @patch("dashboard.management.commands.backup_database.subprocess.run")
+    @patch(
+        "dashboard.management.commands.backup_database.shutil.which",
+        return_value="C:/PostgreSQL/bin/pg_dump.exe",
+    )
+    def test_postgresql_backup_uses_custom_format_without_exposing_password(
+        self, _which, run
+    ):
+        run.return_value = SimpleNamespace(returncode=0, stderr="")
+        database = SimpleNamespace(
+            settings_dict={
+                "NAME": "feeloom",
+                "HOST": "database.example",
+                "PORT": "5432",
+                "USER": "feeloom_user",
+                "PASSWORD": "private-password",
+                "OPTIONS": {"sslmode": "require"},
+            }
+        )
+
+        BackupDatabaseCommand._backup_postgresql(database, Path("backup.dump"))
+
+        command = run.call_args.args[0]
+        environment = run.call_args.kwargs["env"]
+        self.assertIn("--format=custom", command)
+        self.assertIn("--no-owner", command)
+        self.assertIn("--host=database.example", command)
+        self.assertNotIn("private-password", command)
+        self.assertEqual(environment["PGPASSWORD"], "private-password")
+        self.assertEqual(environment["PGSSLMODE"], "require")

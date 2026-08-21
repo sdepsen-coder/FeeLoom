@@ -4,6 +4,8 @@ __pycache__/
 *.py[cod]
 db.sqlite3
 staticfiles/
+backups/
+*.dump
 .coverage
 .pytest_cache/
 .idea/

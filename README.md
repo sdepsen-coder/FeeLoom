@@ -47,6 +47,24 @@ can then connect each shop and run an incremental order sync from the Shops page
 
 For scheduled syncing, run `python manage.py sync_etsy` from the platform scheduler.
 
+## Backups
+
+Create a consistent local or production database backup with:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py backup_database
+```
+
+SQLite backups use the database backup API. PostgreSQL backups use `pg_dump` and
+are written in its compressed custom format. Set `FEELOOM_BACKUP_DIR` or pass
+`--output` to choose the destination. Existing files are never replaced unless
+`--overwrite` is supplied.
+
+Keep the production `FEELOOM_TOKEN_ENCRYPTION_KEY` and `DJANGO_SECRET_KEY` in a
+separate password manager. A database backup without the original token encryption
+key cannot restore Etsy connections. Test PostgreSQL restores with `pg_restore`
+before relying on a backup, and never commit backup files or secrets to Git.
+
 ## Render preview
 
 The Blueprint provisions a free web service and free PostgreSQL database. Render

@@ -1,0 +1,8 @@
+Hello {{ user.username }},
+
+Verify your email to activate your FeeLoom workspace:
+{{ verification_url }}
+
+If you did not create this account, you can ignore this email.
+
+FeeLoom

@@ -1,9 +1,14 @@
 from django.contrib.auth import login
 from django.contrib.auth import views as auth_views
 from django.conf import settings
+from django.contrib.auth.models import User
+from django.core.mail import send_mail
 from django.db import transaction
 from django.shortcuts import redirect, render
-from django.urls import reverse_lazy
+from django.template.loader import render_to_string
+from django.urls import reverse, reverse_lazy
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.utils.text import slugify
 
 from workspaces.models import Membership, Shop, Workspace
@@ -11,6 +16,7 @@ from workspaces.selectors import ACTIVE_SHOP_SESSION_KEY
 
 from .forms import SignupForm
 from .models import BetaInvite, LegalAcceptance
+from .tokens import email_verification_token
 
 
 class FeeLoomPasswordResetView(auth_views.PasswordResetView):
@@ -23,6 +29,25 @@ class FeeLoomPasswordResetView(auth_views.PasswordResetView):
         if not settings.EMAIL_DELIVERY_ENABLED:
             return render(request, "registration/password_reset_unavailable.html")
         return super().dispatch(request, *args, **kwargs)
+
+
+def send_verification_email(request, user):
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+    token = email_verification_token.make_token(user)
+    verification_url = request.build_absolute_uri(
+        reverse("verify_email", args=[uid, token])
+    )
+    message = render_to_string(
+        "accounts/verification_email.txt",
+        {"user": user, "verification_url": verification_url},
+    )
+    send_mail(
+        "Verify your FeeLoom email",
+        message,
+        settings.DEFAULT_FROM_EMAIL,
+        [user.email],
+        fail_silently=False,
+    )
 
 
 def unique_workspace_slug(name):
@@ -50,6 +75,7 @@ def signup(request):
                 return render(request, "accounts/signup.html", {"form": form}, status=400)
             user = form.save(commit=False)
             user.email = form.cleaned_data["email"]
+            user.is_active = not settings.EMAIL_VERIFICATION_REQUIRED
             user.save()
             workspace = Workspace.objects.create(
                 name=form.cleaned_data["workspace_name"],
@@ -71,8 +97,40 @@ def signup(request):
             )
             invite.use_count += 1
             invite.save(update_fields=["use_count"])
+            if settings.EMAIL_VERIFICATION_REQUIRED:
+                send_verification_email(request, user)
+        if settings.EMAIL_VERIFICATION_REQUIRED:
+            return render(
+                request,
+                "accounts/verification_sent.html",
+                {"verification_email": user.email},
+            )
         login(request, user)
         request.session[ACTIVE_SHOP_SESSION_KEY] = shop.id
         return redirect("getting_started")
 
     return render(request, "accounts/signup.html", {"form": form})
+
+
+def verify_email(request, uidb64, token):
+    try:
+        user_id = force_str(urlsafe_base64_decode(uidb64))
+        user = User.objects.get(id=user_id)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = None
+    if user and not user.is_active and email_verification_token.check_token(user, token):
+        user.is_active = True
+        user.save(update_fields=["is_active"])
+        login(request, user)
+        membership = user.workspace_memberships.select_related("workspace").filter(
+            is_active=True
+        ).first()
+        first_shop = (
+            membership.workspace.shops.filter(is_active=True).first()
+            if membership
+            else None
+        )
+        if first_shop:
+            request.session[ACTIVE_SHOP_SESSION_KEY] = first_shop.id
+        return redirect("getting_started")
+    return render(request, "accounts/verification_invalid.html", status=400)

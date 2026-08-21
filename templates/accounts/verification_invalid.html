@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Verification link invalid | FeeLoom{% endblock %}
+{% block content %}
+  <section class="auth-panel">
+    <p class="eyebrow">EMAIL VERIFICATION</p><h1>This link is no longer valid</h1>
+    <p class="form-note">The verification link is invalid or has already been used.</p>
+    <a class="primary-button" href="{% url 'login' %}">Back to sign in</a>
+  </section>
+{% endblock %}

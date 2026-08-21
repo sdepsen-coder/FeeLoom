@@ -31,6 +31,10 @@ Public beta legal pages are available at `/privacy/` and `/terms/`. Set
 Password recovery is enabled automatically when `EMAIL_HOST`, `EMAIL_HOST_USER`,
 `EMAIL_HOST_PASSWORD`, and a verified `DEFAULT_FROM_EMAIL` are configured. The
 remaining SMTP settings are listed in `.env.example`.
+
+On production, new accounts require email verification whenever email delivery
+is configured. Verification links are single-use and activate the workspace on
+first use.
 FeeLoom requests read-only `shops_r` and `transactions_r` scopes. Owners and managers
 can then connect each shop and run an incremental order sync from the Shops page.
 

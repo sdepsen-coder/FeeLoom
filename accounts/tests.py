@@ -12,6 +12,7 @@ from workspaces.selectors import ACTIVE_SHOP_SESSION_KEY
 from .models import BetaInvite, LegalAcceptance
 
 
+@override_settings(EMAIL_VERIFICATION_REQUIRED=False)
 class SignupTests(TestCase):
     def setUp(self):
         issuer = User.objects.create_user(username="beta-owner")
@@ -172,3 +173,43 @@ class SignupTests(TestCase):
 
         self.assertNotContains(login_response, "Forgot your password?")
         self.assertContains(reset_response, "Password reset is not available yet")
+
+    @override_settings(
+        EMAIL_DELIVERY_ENABLED=True,
+        EMAIL_VERIFICATION_REQUIRED=True,
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    )
+    def test_signup_requires_single_use_email_verification(self):
+        response = self.client.post(
+            reverse("signup"),
+            {
+                "invite_code": self.invite.code,
+                "username": "verify-seller",
+                "email": "verify@example.com",
+                "workspace_name": "Verify Studio",
+                "shop_name": "Verify Shop",
+                "password1": "strong-start-pass-123",
+                "password2": "strong-start-pass-123",
+                "accept_terms": "on",
+            },
+        )
+
+        user = User.objects.get(username="verify-seller")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Check your email")
+        self.assertFalse(user.is_active)
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertEqual(len(mail.outbox), 1)
+
+        verification_url = re.search(
+            r"http://testserver(\S+)", mail.outbox[0].body
+        ).group(1)
+        verification_response = self.client.get(verification_url)
+        self.assertRedirects(verification_response, reverse("getting_started"))
+        user.refresh_from_db()
+        self.assertTrue(user.is_active)
+        self.assertIn("_auth_user_id", self.client.session)
+
+        reused_response = self.client.get(verification_url)
+        self.assertEqual(reused_response.status_code, 400)
+        self.assertContains(reused_response, "no longer valid", status_code=400)

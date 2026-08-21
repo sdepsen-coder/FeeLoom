@@ -24,6 +24,9 @@ The repository includes `sample_data/EtsySoldOrdersSample.csv` for local testing
 
 Set `ETSY_API_KEY`, `ETSY_SHARED_SECRET`, `ETSY_REDIRECT_URI`, and a long random
 `FEELOOM_TOKEN_ENCRYPTION_KEY`. Register the exact redirect URI in Etsy's app settings.
+
+Public beta legal pages are available at `/privacy/` and `/terms/`. Set
+`FEELOOM_SUPPORT_EMAIL` to publish a support address on both pages.
 FeeLoom requests read-only `shops_r` and `transactions_r` scopes. Owners and managers
 can then connect each shop and run an incremental order sync from the Shops page.
 

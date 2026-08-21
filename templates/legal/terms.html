@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Terms of Service | FeeLoom{% endblock %}
+{% block content %}
+  <article class="legal-document">
+    <header><p class="eyebrow">LEGAL</p><h1>Terms of Service</h1><p>Last updated {{ legal_version }}</p></header>
+    <section><h2>Service</h2><p>FeeLoom is a beta tool that helps Etsy sellers organize order data, costs, fees, and estimated profit. Features may change as the beta develops. FeeLoom is independent from Etsy and is not endorsed or certified by Etsy, Inc.</p></section>
+    <section><h2>Your account</h2><p>You must provide accurate registration information, protect your password, and use only shops and data you are authorized to access. You are responsible for activity under your account and for keeping your own source records.</p></section>
+    <section><h2>Etsy connection</h2><p>If you connect Etsy, you authorize FeeLoom to read only the scopes shown on Etsy's consent screen. You can disconnect a shop at any time. You must not use FeeLoom to scrape Etsy, bypass Etsy controls, or violate Etsy's terms or applicable law.</p></section>
+    <section><h2>Profit estimates</h2><p>Results depend on the completeness and accuracy of imported orders, Etsy fee data, and costs you enter. FeeLoom does not provide accounting, tax, legal, or financial advice. Verify figures before making business or filing decisions.</p></section>
+    <section><h2>Acceptable use</h2><p>Do not interfere with the service, attempt unauthorized access, introduce harmful code, misuse another person's data, or use FeeLoom for unlawful activity. Access may be limited or suspended to protect users, Etsy, or the service.</p></section>
+    <section><h2>Availability and data</h2><p>The beta is provided on an as-available basis and may experience interruptions. You should retain copies of important source records and use the workspace export when needed. No service can guarantee uninterrupted operation or absolute security.</p></section>
+    <section><h2>Ending use</h2><p>You can stop using FeeLoom, disconnect Etsy, or permanently delete your workspace from Privacy &amp; data. FeeLoom may stop or restrict access when necessary for security, legal compliance, or material violations of these terms.</p></section>
+    <section><h2>Changes</h2><p>These terms may be updated as the service changes. A new date or version will be shown, and a new acceptance may be requested when changes are material.</p></section>
+    <section><h2>Contact</h2>{% if support_email %}<p>Questions can be sent to <a href="mailto:{{ support_email }}">{{ support_email }}</a>.</p>{% elif request.user.is_authenticated %}<p>Send questions through the <a href="{% url 'feedback' %}?from={{ request.path|urlencode }}">Feedback page</a>.</p>{% else %}<p>Account holders can send questions through FeeLoom's in-app Feedback page.</p>{% endif %}</section>
+  </article>
+{% endblock %}

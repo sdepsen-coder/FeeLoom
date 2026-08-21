@@ -43,6 +43,7 @@
           {% if messages %}<div class="message-list">{% for message in messages %}<div class="message message-{{ message.tags }}">{{ message }}</div>{% endfor %}</div>{% endif %}
           {% block content %}{% endblock %}
         </main>
+        <footer class="site-footer"><span>FeeLoom beta</span><a href="{% url 'privacy_policy' %}">Privacy</a><a href="{% url 'terms_of_service' %}">Terms</a></footer>
       </div>
     </div>
   </body>

@@ -4,6 +4,7 @@ from django.urls import reverse
 
 from workspaces.models import Membership, Shop, Workspace
 from workspaces.selectors import ACTIVE_SHOP_SESSION_KEY
+from .models import LegalAcceptance
 
 
 class SignupTests(TestCase):
@@ -17,6 +18,7 @@ class SignupTests(TestCase):
                 "shop_name": "Studio Gifts",
                 "password1": "strong-start-pass-123",
                 "password2": "strong-start-pass-123",
+                "accept_terms": "on",
             },
         )
 
@@ -30,6 +32,7 @@ class SignupTests(TestCase):
         self.assertEqual(membership.role, Membership.Role.OWNER)
         self.assertIn("_auth_user_id", self.client.session)
         self.assertEqual(self.client.session[ACTIVE_SHOP_SESSION_KEY], shop.id)
+        self.assertTrue(LegalAcceptance.objects.filter(user=user).exists())
 
     def test_signup_rejects_duplicate_email(self):
         User.objects.create_user(username="existing", email="maker@example.com")
@@ -43,9 +46,36 @@ class SignupTests(TestCase):
                 "shop_name": "Other Gifts",
                 "password1": "strong-start-pass-123",
                 "password2": "strong-start-pass-123",
+                "accept_terms": "on",
             },
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "An account with this email already exists")
         self.assertFalse(Workspace.objects.filter(name="Other Studio").exists())
+
+    def test_signup_requires_terms_acceptance(self):
+        response = self.client.post(
+            reverse("signup"),
+            {
+                "username": "no-terms",
+                "email": "no-terms@example.com",
+                "workspace_name": "No Terms Studio",
+                "shop_name": "No Terms Shop",
+                "password1": "strong-start-pass-123",
+                "password2": "strong-start-pass-123",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "This field is required")
+        self.assertFalse(User.objects.filter(username="no-terms").exists())
+
+    def test_legal_pages_are_public(self):
+        privacy_response = self.client.get(reverse("privacy_policy"))
+        terms_response = self.client.get(reverse("terms_of_service"))
+
+        self.assertEqual(privacy_response.status_code, 200)
+        self.assertEqual(terms_response.status_code, 200)
+        self.assertContains(privacy_response, "Privacy Policy")
+        self.assertContains(terms_response, "Terms of Service")

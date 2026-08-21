@@ -6,6 +6,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from accounts.models import LegalAcceptance
 from integrations.models import EtsyConnection
 from sales.models import ImportBatch, Order, OrderItem, ProductCost
 from workspaces.models import Membership, Shop, Workspace
@@ -316,6 +317,7 @@ class DashboardTests(TestCase):
         self.assertIn(b"Order ID", content)
 
     def test_workspace_export_contains_only_current_workspace_and_no_tokens(self):
+        LegalAcceptance.objects.create(user=self.user, version="2026-08-21")
         EtsyConnection.objects.create(
             shop=self.shop,
             etsy_user_id="etsy-user-1",
@@ -341,6 +343,7 @@ class DashboardTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "application/json")
         self.assertIn("ORDER-100", content)
+        self.assertIn("2026-08-21", content)
         self.assertNotIn("PRIVATE-EXPORT-1", content)
         self.assertNotIn("access_token_ciphertext", content)
         self.assertNotIn("refresh_token_ciphertext", content)

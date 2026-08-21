@@ -16,6 +16,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 
+from accounts.models import LegalAcceptance
 from integrations.models import EtsyConnection, EtsySyncRun
 from sales.importers import CSVImportError, import_etsy_orders
 from sales.models import FeeLine, ImportBatch, Order, OrderItem, ProductCost
@@ -326,6 +327,11 @@ def export_workspace_data(request):
         "memberships": list(
             workspace.memberships.order_by("id").values(
                 "id", "user__username", "user__email", "role", "is_active", "created_at"
+            )
+        ),
+        "legal_acceptances": list(
+            LegalAcceptance.objects.filter(user=request.user).order_by("id").values(
+                "id", "version", "accepted_at"
             )
         ),
         "shops": [

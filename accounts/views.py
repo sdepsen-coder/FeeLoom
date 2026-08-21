@@ -1,4 +1,5 @@
 from django.contrib.auth import login
+from django.conf import settings
 from django.db import transaction
 from django.shortcuts import redirect, render
 from django.utils.text import slugify
@@ -7,6 +8,7 @@ from workspaces.models import Membership, Shop, Workspace
 from workspaces.selectors import ACTIVE_SHOP_SESSION_KEY
 
 from .forms import SignupForm
+from .models import LegalAcceptance
 
 
 def unique_workspace_slug(name):
@@ -42,6 +44,10 @@ def signup(request):
             shop = Shop.objects.create(
                 workspace=workspace,
                 name=form.cleaned_data["shop_name"],
+            )
+            LegalAcceptance.objects.create(
+                user=user,
+                version=settings.FEELOOM_LEGAL_VERSION,
             )
         login(request, user)
         request.session[ACTIVE_SHOP_SESSION_KEY] = shop.id

@@ -17,10 +17,12 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import include, path
 
-from .views import health_check
+from .views import health_check, privacy_policy, terms_of_service
 
 urlpatterns = [
     path('health/', health_check, name='health_check'),
+    path('privacy/', privacy_policy, name='privacy_policy'),
+    path('terms/', terms_of_service, name='terms_of_service'),
     path('admin/', admin.site.urls),
     path('accounts/', include('accounts.urls')),
     path('integrations/', include('integrations.urls')),

@@ -3,6 +3,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from workspaces.models import Membership, Shop, Workspace
+from workspaces.selectors import ACTIVE_SHOP_SESSION_KEY
 
 
 class SignupTests(TestCase):
@@ -28,6 +29,7 @@ class SignupTests(TestCase):
         self.assertEqual(shop.name, "Studio Gifts")
         self.assertEqual(membership.role, Membership.Role.OWNER)
         self.assertIn("_auth_user_id", self.client.session)
+        self.assertEqual(self.client.session[ACTIVE_SHOP_SESSION_KEY], shop.id)
 
     def test_signup_rejects_duplicate_email(self):
         User.objects.create_user(username="existing", email="maker@example.com")

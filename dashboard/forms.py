@@ -1,13 +1,21 @@
 from django import forms
 
 from sales.models import ProductCost
+from workspaces.models import Shop
 
 
 class EtsyCSVImportForm(forms.Form):
+    shop = forms.ModelChoiceField(queryset=Shop.objects.none(), label="Shop")
     csv_file = forms.FileField(
         label="Etsy Orders CSV",
         widget=forms.ClearableFileInput(attrs={"accept": ".csv,text/csv"}),
     )
+
+    def __init__(self, *args, shops=(), selected_shop=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        shop_ids = [shop.id for shop in shops]
+        self.fields["shop"].queryset = Shop.objects.filter(id__in=shop_ids).order_by("name")
+        self.fields["shop"].initial = selected_shop
 
     def clean_csv_file(self):
         uploaded_file = self.cleaned_data["csv_file"]
@@ -24,3 +32,13 @@ class ProductCostForm(forms.ModelForm):
             field: forms.NumberInput(attrs={"step": "0.01", "min": "0"})
             for field in ("materials", "packaging", "labor", "overhead")
         }
+
+
+class ShopForm(forms.ModelForm):
+    class Meta:
+        model = Shop
+        fields = ("name", "currency")
+        widgets = {"currency": forms.TextInput(attrs={"maxlength": "3"})}
+
+    def clean_currency(self):
+        return self.cleaned_data["currency"].strip().upper()

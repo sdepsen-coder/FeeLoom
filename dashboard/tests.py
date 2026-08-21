@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from sales.models import ImportBatch, Order, OrderItem, ProductCost
 from workspaces.models import Membership, Shop, Workspace
+from workspaces.selectors import ACTIVE_SHOP_SESSION_KEY, ALL_SHOPS_VALUE
 
 
 class DashboardTests(TestCase):
@@ -130,7 +131,9 @@ class DashboardTests(TestCase):
             content_type="text/csv",
         )
 
-        response = self.client.post(reverse("import_sales"), {"csv_file": uploaded})
+        response = self.client.post(
+            reverse("import_sales"), {"shop": self.shop.id, "csv_file": uploaded}
+        )
 
         self.assertEqual(response.status_code, 302)
         self.assertTrue(
@@ -152,3 +155,89 @@ class DashboardTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "private.csv")
+
+    def test_all_shops_combines_orders_and_identifies_shop(self):
+        second_shop = Shop.objects.create(workspace=self.workspace, name="Second Shop")
+        Order.objects.create(
+            shop=second_shop,
+            external_order_id="ORDER-200",
+            ordered_at=timezone.now(),
+            item_revenue=Decimal("60.00"),
+            net_profit=Decimal("30.00"),
+            profit_status=Order.ProfitStatus.PROFITABLE,
+        )
+        self.client.force_login(self.user)
+        session = self.client.session
+        session[ACTIVE_SHOP_SESSION_KEY] = ALL_SHOPS_VALUE
+        session.save()
+
+        dashboard_response = self.client.get(reverse("dashboard"))
+        sales_response = self.client.get(reverse("sales_table"))
+
+        self.assertContains(dashboard_response, "USD 100.00")
+        self.assertContains(sales_response, "ORDER-100")
+        self.assertContains(sales_response, "ORDER-200")
+        self.assertContains(sales_response, "Second Shop")
+
+    def test_switching_shop_scopes_sales(self):
+        second_shop = Shop.objects.create(workspace=self.workspace, name="Second Shop")
+        Order.objects.create(
+            shop=second_shop,
+            external_order_id="ORDER-200",
+            ordered_at=timezone.now(),
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("switch_shop"), {"shop": second_shop.id, "next": reverse("sales_table")}
+        )
+        sales_response = self.client.get(reverse("sales_table"))
+
+        self.assertRedirects(response, reverse("sales_table"))
+        self.assertEqual(self.client.session[ACTIVE_SHOP_SESSION_KEY], second_shop.id)
+        self.assertContains(sales_response, "ORDER-200")
+        self.assertNotContains(sales_response, "ORDER-100")
+
+    def test_cannot_switch_to_another_workspace_shop(self):
+        other_user = User.objects.create_user(username="outsider")
+        other_workspace = Workspace.objects.create(
+            name="Outside", slug="outside", owner=other_user
+        )
+        outside_shop = Shop.objects.create(workspace=other_workspace, name="Private Shop")
+        self.client.force_login(self.user)
+
+        response = self.client.post(reverse("switch_shop"), {"shop": outside_shop.id})
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_owner_can_add_a_second_shop(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("shops"), {"name": "New Store", "currency": "usd"}
+        )
+
+        new_shop = Shop.objects.get(workspace=self.workspace, name="New Store")
+        self.assertRedirects(response, reverse("shops"))
+        self.assertEqual(new_shop.currency, "USD")
+        self.assertEqual(self.client.session[ACTIVE_SHOP_SESSION_KEY], new_shop.id)
+
+    def test_import_rejects_shop_from_another_workspace(self):
+        other_user = User.objects.create_user(username="import-outsider")
+        other_workspace = Workspace.objects.create(
+            name="Import Outside", slug="import-outside", owner=other_user
+        )
+        outside_shop = Shop.objects.create(workspace=other_workspace, name="Outside Import")
+        self.client.force_login(self.user)
+        uploaded = SimpleUploadedFile(
+            "orders.csv",
+            b"Sale Date,Order ID,Order Value\n08/16/2026,PRIVATE-1,30.00\n",
+            content_type="text/csv",
+        )
+
+        response = self.client.post(
+            reverse("import_sales"), {"shop": outside_shop.id, "csv_file": uploaded}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Order.objects.filter(external_order_id="PRIVATE-1").exists())

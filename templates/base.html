@@ -17,12 +17,25 @@
             <a class="{% if request.resolver_match.url_name == 'sales_table' or request.resolver_match.url_name == 'sale_detail' %}active{% endif %}" href="{% url 'sales_table' %}">Sales</a>
             <a class="{% if request.resolver_match.url_name == 'import_sales' %}active{% endif %}" href="{% url 'import_sales' %}">Import</a>
             <a class="{% if request.resolver_match.url_name == 'product_costs' %}active{% endif %}" href="{% url 'product_costs' %}">Product costs</a>
+            <a class="{% if request.resolver_match.url_name == 'shops' %}active{% endif %}" href="{% url 'shops' %}">Shops</a>
           </nav>
           <div class="sidebar-footer"><span>{{ request.user.username }}</span><form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="text-button" type="submit">Sign out</button></form></div>
         {% endif %}
       </aside>
       <div class="content-shell">
-        <header class="topbar"><div><strong>{% if shop %}{{ shop.name }}{% else %}FeeLoom{% endif %}</strong>{% if membership %}<span>{{ membership.get_role_display }}</span>{% endif %}</div>{% block topbar_actions %}{% endblock %}</header>
+        <header class="topbar">
+          {% if membership and shops %}
+            <form class="shop-switcher" method="post" action="{% url 'switch_shop' %}">
+              {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <label for="active-shop">Shop</label>
+              <select id="active-shop" name="shop" onchange="this.form.submit()">
+                <option value="all" {% if all_shops %}selected{% endif %}>All shops</option>
+                {% for available_shop in shops %}<option value="{{ available_shop.id }}" {% if shop.id == available_shop.id %}selected{% endif %}>{{ available_shop.name }}</option>{% endfor %}
+              </select>
+            </form>
+          {% else %}<div><strong>FeeLoom</strong></div>{% endif %}
+          <div class="topbar-meta">{% if membership %}<span>{{ membership.workspace.name }} · {{ membership.get_role_display }}</span>{% endif %}{% block topbar_actions %}{% endblock %}</div>
+        </header>
         <main class="page">{% block content %}{% endblock %}</main>
       </div>
     </div>

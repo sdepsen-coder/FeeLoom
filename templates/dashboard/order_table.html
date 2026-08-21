@@ -1,15 +1,15 @@
 <div class="table-wrap">
   <table>
-    <thead><tr><th>Date</th><th>Order</th><th>Product</th><th class="numeric">Gross</th><th class="numeric">Fees</th><th class="numeric">Net profit</th><th>Margin</th></tr></thead>
+    <thead><tr><th>Date</th>{% if show_shop %}<th>Shop</th>{% endif %}<th>Order</th><th>Product</th><th class="numeric">Gross</th><th class="numeric">Fees</th><th class="numeric">Net profit</th><th>Margin</th></tr></thead>
     <tbody>
       {% for order in orders %}
         <tr>
-          <td>{{ order.ordered_at|date:"M j, Y" }}</td><td><a class="order-link" href="{% url 'sale_detail' order.id %}">{{ order.external_order_id }}</a></td>
+          <td>{{ order.ordered_at|date:"M j, Y" }}</td>{% if show_shop %}<td>{{ order.shop.name }}</td>{% endif %}<td><a class="order-link" href="{% url 'sale_detail' order.id %}">{{ order.external_order_id }}</a></td>
           <td>{% with item=order.items.all|first %}{% if item %}{{ item.title }}{% else %}-{% endif %}{% endwith %}</td>
           <td class="numeric">{{ order.currency }} {{ order.gross_sales|floatformat:2 }}</td><td class="numeric">{{ order.currency }} {{ order.total_fees|floatformat:2 }}</td>
           <td class="numeric profit-{{ order.profit_status }}">{{ order.currency }} {{ order.net_profit|floatformat:2 }}</td><td><span class="status status-{{ order.profit_status }}">{{ order.margin_percent|floatformat:1 }}%</span></td>
         </tr>
-      {% empty %}<tr><td class="empty-state" colspan="7">No sales imported yet.</td></tr>{% endfor %}
+      {% empty %}<tr><td class="empty-state" colspan="8">No sales imported yet.</td></tr>{% endfor %}
     </tbody>
   </table>
 </div>

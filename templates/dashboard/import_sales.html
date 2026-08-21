@@ -22,7 +22,7 @@
     <aside class="plain-panel">
       <h2>Recent imports</h2>
       <div class="import-list">
-        {% for batch in imports %}<a href="?batch={{ batch.id }}"><span>{{ batch.file_name }}</span><small>{{ batch.created_at|date:"M j, Y H:i" }} · {{ batch.imported_rows }} imported</small></a>{% empty %}<p class="form-note">No files imported yet.</p>{% endfor %}
+        {% for batch in imports %}<a href="?batch={{ batch.id }}"><span>{{ batch.file_name }}</span><small>{{ batch.shop.name }} · {{ batch.created_at|date:"M j, Y H:i" }} · {{ batch.imported_rows }} imported</small></a>{% empty %}<p class="form-note">No files imported yet.</p>{% endfor %}
       </div>
     </aside>
   </div>

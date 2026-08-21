@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Shops | FeeLoom{% endblock %}
+{% block content %}
+  <header class="page-heading"><div><p class="eyebrow">WORKSPACE</p><h1>Shops</h1></div></header>
+  <div class="split-layout">
+    <section>
+      <div class="section-heading"><div><h2>Connected businesses</h2><p>Each shop keeps its own sales and product costs.</p></div></div>
+      <div class="shop-list">
+        {% for workspace_shop in workspace_shops %}
+          <article class="shop-row">
+            <div><strong>{{ workspace_shop.name }}</strong><span>{{ workspace_shop.get_marketplace_display }} · {{ workspace_shop.currency }}</span></div>
+            <div class="actions"><span class="status {% if workspace_shop.is_active %}status-profitable{% endif %}">{% if workspace_shop.is_active %}Active{% else %}Inactive{% endif %}</span>{% if can_manage_shops %}<form method="post" action="{% url 'toggle_shop' workspace_shop.id %}">{% csrf_token %}<button class="secondary-button compact" type="submit">{% if workspace_shop.is_active %}Deactivate{% else %}Activate{% endif %}</button></form>{% endif %}</div>
+          </article>
+        {% empty %}<p class="empty-state">No shops yet.</p>{% endfor %}
+      </div>
+    </section>
+    {% if can_manage_shops %}<aside class="form-panel"><h2>Add shop</h2><form method="post" class="stack-form">{% csrf_token %}{{ form.as_p }}<button class="primary-button" type="submit">Add shop</button></form></aside>{% endif %}
+  </div>
+{% endblock %}

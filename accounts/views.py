@@ -4,6 +4,7 @@ from django.shortcuts import redirect, render
 from django.utils.text import slugify
 
 from workspaces.models import Membership, Shop, Workspace
+from workspaces.selectors import ACTIVE_SHOP_SESSION_KEY
 
 from .forms import SignupForm
 
@@ -38,11 +39,12 @@ def signup(request):
                 user=user,
                 role=Membership.Role.OWNER,
             )
-            Shop.objects.create(
+            shop = Shop.objects.create(
                 workspace=workspace,
                 name=form.cleaned_data["shop_name"],
             )
         login(request, user)
+        request.session[ACTIVE_SHOP_SESSION_KEY] = shop.id
         return redirect("dashboard")
 
     return render(request, "accounts/signup.html", {"form": form})

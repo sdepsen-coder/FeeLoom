@@ -47,10 +47,22 @@ class ShopForm(forms.ModelForm):
 
 
 class FeedbackForm(forms.ModelForm):
+    rating = forms.TypedChoiceField(
+        label="How useful is FeeLoom? (1 = worst, 5 = best)",
+        coerce=int,
+        choices=(
+            (1, "1 - Worst"),
+            (2, "2"),
+            (3, "3 - Neutral"),
+            (4, "4"),
+            (5, "5 - Best"),
+        ),
+    )
+
     class Meta:
         model = Feedback
         fields = ("category", "rating", "message", "page_path")
-        labels = {"rating": "How useful is FeeLoom?", "message": "Tell us what happened"}
+        labels = {"message": "Tell us what happened"}
         widgets = {
             "message": forms.Textarea(
                 attrs={

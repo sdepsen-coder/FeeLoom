@@ -270,6 +270,15 @@ class DashboardTests(TestCase):
         self.assertEqual(submission.user, self.user)
         self.assertEqual(submission.page_path, "/sales/1/")
 
+    def test_feedback_rating_scale_is_explained(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("feedback"))
+
+        self.assertContains(response, "1 = worst, 5 = best")
+        self.assertContains(response, "1 - Worst")
+        self.assertContains(response, "5 - Best")
+
     def test_feedback_rejects_external_source_url(self):
         self.client.force_login(self.user)
 

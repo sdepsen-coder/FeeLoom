@@ -6,6 +6,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from integrations.models import EtsyConnection
 from sales.models import ImportBatch, Order, OrderItem, ProductCost
 from workspaces.models import Membership, Shop, Workspace
 from workspaces.selectors import ACTIVE_SHOP_SESSION_KEY, ALL_SHOPS_VALUE
@@ -313,3 +314,104 @@ class DashboardTests(TestCase):
         self.assertEqual(response["Content-Type"], "text/csv")
         self.assertIn("attachment", response["Content-Disposition"])
         self.assertIn(b"Order ID", content)
+
+    def test_workspace_export_contains_only_current_workspace_and_no_tokens(self):
+        EtsyConnection.objects.create(
+            shop=self.shop,
+            etsy_user_id="etsy-user-1",
+            access_token_ciphertext="secret-access-token",
+            refresh_token_ciphertext="secret-refresh-token",
+            token_expires_at=timezone.now(),
+        )
+        other_user = User.objects.create_user(username="export-outsider")
+        other_workspace = Workspace.objects.create(
+            name="Outside Export", slug="outside-export", owner=other_user
+        )
+        other_shop = Shop.objects.create(workspace=other_workspace, name="Hidden Export Shop")
+        Order.objects.create(
+            shop=other_shop,
+            external_order_id="PRIVATE-EXPORT-1",
+            ordered_at=timezone.now(),
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("export_workspace_data"))
+        content = response.content.decode()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/json")
+        self.assertIn("ORDER-100", content)
+        self.assertNotIn("PRIVATE-EXPORT-1", content)
+        self.assertNotIn("access_token_ciphertext", content)
+        self.assertNotIn("refresh_token_ciphertext", content)
+        self.assertNotIn("secret-access-token", content)
+        self.assertNotIn("secret-refresh-token", content)
+
+    def test_only_workspace_owner_can_delete_workspace(self):
+        manager = User.objects.create_user(username="manager", password="manager-pass")
+        Membership.objects.create(
+            workspace=self.workspace,
+            user=manager,
+            role=Membership.Role.MANAGER,
+        )
+        self.client.force_login(manager)
+
+        response = self.client.post(
+            reverse("delete_workspace"),
+            {"workspace_name": self.workspace.name, "password": "manager-pass"},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Workspace.objects.filter(id=self.workspace.id).exists())
+
+        export_response = self.client.get(reverse("export_workspace_data"))
+        self.assertEqual(export_response.status_code, 403)
+
+    def test_workspace_deletion_requires_exact_name_and_password(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("delete_workspace"),
+            {"workspace_name": "Wrong name", "password": "wrong-password"},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(Workspace.objects.filter(id=self.workspace.id).exists())
+        self.assertContains(response, "Enter the workspace name exactly as shown.", status_code=400)
+        self.assertContains(response, "Your password is incorrect.", status_code=400)
+
+    def test_workspace_owner_can_delete_only_workspace_and_account(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("delete_workspace"),
+            {"workspace_name": self.workspace.name, "password": "test-pass-123"},
+        )
+
+        self.assertRedirects(response, reverse("login"))
+        self.assertFalse(Workspace.objects.filter(id=self.workspace.id).exists())
+        self.assertFalse(User.objects.filter(id=self.user.id).exists())
+        self.assertFalse(Order.objects.filter(id=self.order.id).exists())
+
+    def test_workspace_deletion_keeps_account_with_another_active_membership(self):
+        other_owner = User.objects.create_user(username="other-owner")
+        other_workspace = Workspace.objects.create(
+            name="Shared Studio", slug="shared-studio", owner=other_owner
+        )
+        Membership.objects.create(
+            workspace=other_workspace,
+            user=self.user,
+            role=Membership.Role.MANAGER,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("delete_workspace"),
+            {"workspace_name": self.workspace.name, "password": "test-pass-123"},
+        )
+
+        self.assertRedirects(response, reverse("login"))
+        self.assertTrue(User.objects.filter(id=self.user.id).exists())
+        self.assertTrue(
+            Membership.objects.filter(user=self.user, workspace=other_workspace).exists()
+        )

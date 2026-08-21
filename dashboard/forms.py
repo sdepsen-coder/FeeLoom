@@ -76,3 +76,25 @@ class FeedbackForm(forms.ModelForm):
     def clean_page_path(self):
         page_path = self.cleaned_data.get("page_path", "").strip()
         return page_path if page_path.startswith("/") and not page_path.startswith("//") else ""
+
+
+class DeleteWorkspaceForm(forms.Form):
+    workspace_name = forms.CharField(label="Workspace name", max_length=160)
+    password = forms.CharField(label="Your password", widget=forms.PasswordInput)
+
+    def __init__(self, *args, user, workspace, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+        self.workspace = workspace
+
+    def clean_workspace_name(self):
+        workspace_name = self.cleaned_data["workspace_name"].strip()
+        if workspace_name != self.workspace.name:
+            raise forms.ValidationError("Enter the workspace name exactly as shown.")
+        return workspace_name
+
+    def clean_password(self):
+        password = self.cleaned_data["password"]
+        if not self.user.check_password(password):
+            raise forms.ValidationError("Your password is incorrect.")
+        return password

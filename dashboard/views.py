@@ -1,22 +1,29 @@
 import csv
+import json
 from decimal import Decimal
 from pathlib import Path
 
 from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import Q, Sum
 from django.http import FileResponse, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 
+from integrations.models import EtsyConnection, EtsySyncRun
 from sales.importers import CSVImportError, import_etsy_orders
-from sales.models import ImportBatch, Order, ProductCost
+from sales.models import FeeLine, ImportBatch, Order, OrderItem, ProductCost
 from workspaces.models import Membership, Shop
 from workspaces.selectors import ACTIVE_SHOP_SESSION_KEY, ALL_SHOPS_VALUE, shop_selection
 
-from .forms import EtsyCSVImportForm, FeedbackForm, ProductCostForm, ShopForm
+from .forms import DeleteWorkspaceForm, EtsyCSVImportForm, FeedbackForm, ProductCostForm, ShopForm
+from .models import Feedback
 
 
 def money(value):
@@ -207,6 +214,14 @@ def can_manage_shops(membership):
     return membership and membership.role in {Membership.Role.OWNER, Membership.Role.MANAGER}
 
 
+def is_workspace_owner(request, membership):
+    return (
+        membership
+        and membership.role == Membership.Role.OWNER
+        and membership.workspace.owner_id == request.user.id
+    )
+
+
 @login_required
 def shops(request):
     context = workspace_context(request)
@@ -264,6 +279,147 @@ def feedback(request):
         return redirect(f"{reverse('feedback')}?sent=1")
     context.update({"form": form, "feedback_sent": request.GET.get("sent") == "1"})
     return render(request, "dashboard/feedback.html", context)
+
+
+@login_required
+def privacy_data(request):
+    context = workspace_context(request)
+    if not context["membership"]:
+        raise PermissionDenied
+    owner = is_workspace_owner(request, context["membership"])
+    context.update(
+        {
+            "can_delete_workspace": owner,
+            "delete_form": DeleteWorkspaceForm(
+                user=request.user,
+                workspace=context["membership"].workspace,
+            ) if owner else None,
+        }
+    )
+    return render(request, "dashboard/privacy_data.html", context)
+
+
+@login_required
+def export_workspace_data(request):
+    context = workspace_context(request)
+    membership = context["membership"]
+    if not is_workspace_owner(request, membership):
+        raise PermissionDenied
+    workspace = membership.workspace
+    shops = list(workspace.shops.order_by("id"))
+    shop_ids = [shop.id for shop in shops]
+    orders = list(Order.objects.filter(shop_id__in=shop_ids).order_by("id"))
+    order_ids = [order.id for order in orders]
+    connections = list(EtsyConnection.objects.filter(shop_id__in=shop_ids).order_by("id"))
+    connection_ids = [connection.id for connection in connections]
+
+    payload = {
+        "exported_at": timezone.now(),
+        "workspace": {
+            "id": workspace.id,
+            "name": workspace.name,
+            "slug": workspace.slug,
+            "currency": workspace.currency,
+            "country_code": workspace.country_code,
+            "created_at": workspace.created_at,
+        },
+        "memberships": list(
+            workspace.memberships.order_by("id").values(
+                "id", "user__username", "user__email", "role", "is_active", "created_at"
+            )
+        ),
+        "shops": [
+            {
+                "id": shop.id,
+                "name": shop.name,
+                "marketplace": shop.marketplace,
+                "external_shop_id": shop.external_shop_id,
+                "currency": shop.currency,
+                "is_active": shop.is_active,
+                "created_at": shop.created_at,
+            }
+            for shop in shops
+        ],
+        "product_costs": list(ProductCost.objects.filter(shop_id__in=shop_ids).order_by("id").values()),
+        "orders": [
+            {
+                "id": order.id,
+                "shop_id": order.shop_id,
+                "import_batch_id": order.import_batch_id,
+                "external_order_id": order.external_order_id,
+                "ordered_at": order.ordered_at,
+                "currency": order.currency,
+                "item_revenue": order.item_revenue,
+                "shipping_revenue": order.shipping_revenue,
+                "discounts": order.discounts,
+                "refunds": order.refunds,
+                "shipping_cost": order.shipping_cost,
+                "marketplace_fees": order.marketplace_fees,
+                "ad_fees": order.ad_fees,
+                "product_cost": order.product_cost,
+                "net_profit": order.net_profit,
+                "margin_percent": order.margin_percent,
+                "profit_status": order.profit_status,
+                "created_at": order.created_at,
+                "updated_at": order.updated_at,
+            }
+            for order in orders
+        ],
+        "order_items": list(OrderItem.objects.filter(order_id__in=order_ids).order_by("id").values()),
+        "fee_lines": list(FeeLine.objects.filter(order_id__in=order_ids).order_by("id").values()),
+        "imports": list(ImportBatch.objects.filter(shop_id__in=shop_ids).order_by("id").values()),
+        "etsy_connections": [
+            {
+                "id": connection.id,
+                "shop_id": connection.shop_id,
+                "etsy_user_id": connection.etsy_user_id,
+                "scopes": connection.scopes,
+                "connected_at": connection.connected_at,
+                "updated_at": connection.updated_at,
+                "last_synced_at": connection.last_synced_at,
+                "last_error": connection.last_error,
+                "is_active": connection.is_active,
+            }
+            for connection in connections
+        ],
+        "etsy_sync_runs": list(EtsySyncRun.objects.filter(connection_id__in=connection_ids).order_by("id").values()),
+        "feedback": list(
+            Feedback.objects.filter(workspace=workspace).order_by("id").values(
+                "id", "shop_id", "user_id", "category", "rating", "message", "page_path", "status", "created_at"
+            )
+        ),
+    }
+    response = HttpResponse(
+        json.dumps(payload, cls=DjangoJSONEncoder, indent=2),
+        content_type="application/json",
+    )
+    response["Content-Disposition"] = f'attachment; filename="feeloom-{workspace.slug}-data.json"'
+    return response
+
+
+@login_required
+def delete_workspace(request):
+    if request.method != "POST":
+        return redirect("privacy_data")
+    context = workspace_context(request)
+    membership = context["membership"]
+    if not is_workspace_owner(request, membership):
+        raise PermissionDenied
+    workspace = membership.workspace
+    form = DeleteWorkspaceForm(request.POST, user=request.user, workspace=workspace)
+    if not form.is_valid():
+        context.update({"can_delete_workspace": True, "delete_form": form})
+        return render(request, "dashboard/privacy_data.html", context, status=400)
+    user = request.user
+    workspace.delete()
+    logout(request)
+    if (
+        not user.workspace_memberships.filter(is_active=True).exists()
+        and not user.owned_workspaces.exists()
+    ):
+        user.delete()
+    messages.success(request, "Your workspace, account, and FeeLoom data were permanently deleted.")
+    return redirect("login")
 
 
 @login_required

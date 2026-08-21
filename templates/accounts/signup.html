@@ -3,6 +3,7 @@
 {% block content %}
   <section class="auth-panel wide">
     <p class="eyebrow">START YOUR WORKSPACE</p><h1>Create your FeeLoom account</h1>
+    <p class="form-note">FeeLoom is currently invite-only during beta.</p>
     <form method="post" class="stack-form">{% csrf_token %}{{ form.as_p }}<button class="primary-button" type="submit">Create account</button></form>
     <p class="legal-note">Read the <a href="{% url 'terms_of_service' %}" target="_blank" rel="noopener">Terms</a> and <a href="{% url 'privacy_policy' %}" target="_blank" rel="noopener">Privacy Policy</a>.</p>
     <p class="form-note">Already have an account? <a href="{% url 'login' %}">Sign in</a></p>

@@ -8,7 +8,7 @@ from workspaces.models import Membership, Shop, Workspace
 from workspaces.selectors import ACTIVE_SHOP_SESSION_KEY
 
 from .forms import SignupForm
-from .models import LegalAcceptance
+from .models import BetaInvite, LegalAcceptance
 
 
 def unique_workspace_slug(name):
@@ -28,6 +28,12 @@ def signup(request):
     form = SignupForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         with transaction.atomic():
+            invite = BetaInvite.objects.select_for_update().filter(
+                code__iexact=form.cleaned_data["invite_code"]
+            ).first()
+            if not invite or not invite.is_available:
+                form.add_error("invite_code", "This invite code is no longer available.")
+                return render(request, "accounts/signup.html", {"form": form}, status=400)
             user = form.save(commit=False)
             user.email = form.cleaned_data["email"]
             user.save()
@@ -49,6 +55,8 @@ def signup(request):
                 user=user,
                 version=settings.FEELOOM_LEGAL_VERSION,
             )
+            invite.use_count += 1
+            invite.save(update_fields=["use_count"])
         login(request, user)
         request.session[ACTIVE_SHOP_SESSION_KEY] = shop.id
         return redirect("getting_started")

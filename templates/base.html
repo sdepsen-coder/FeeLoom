@@ -21,6 +21,7 @@
             <a class="{% if request.resolver_match.url_name == 'shops' %}active{% endif %}" href="{% url 'shops' %}">Shops</a>
             <a class="{% if request.resolver_match.url_name == 'feedback' %}active{% endif %}" href="{% url 'feedback' %}?from={{ request.path|urlencode }}">Feedback</a>
             <a class="{% if request.resolver_match.url_name == 'privacy_data' or request.resolver_match.url_name == 'delete_workspace' %}active{% endif %}" href="{% url 'privacy_data' %}">Privacy &amp; data</a>
+            {% if membership.role == 'owner' %}<a class="{% if request.resolver_match.url_name == 'beta_invites' %}active{% endif %}" href="{% url 'beta_invites' %}">Beta invites</a>{% endif %}
           </nav>
           <div class="sidebar-footer"><span>{{ request.user.username }}</span><form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="text-button" type="submit">Sign out</button></form></div>
         {% endif %}

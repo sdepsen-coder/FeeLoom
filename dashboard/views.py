@@ -16,7 +16,8 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 
-from accounts.models import LegalAcceptance
+from accounts.forms import BetaInviteForm
+from accounts.models import BetaInvite, LegalAcceptance
 from integrations.models import EtsyConnection, EtsySyncRun
 from sales.importers import CSVImportError, import_etsy_orders
 from sales.models import FeeLine, ImportBatch, Order, OrderItem, ProductCost
@@ -334,6 +335,11 @@ def export_workspace_data(request):
                 "id", "version", "accepted_at"
             )
         ),
+        "beta_invites": list(
+            BetaInvite.objects.filter(workspace=workspace).order_by("id").values(
+                "id", "code", "label", "max_uses", "use_count", "expires_at", "is_active", "created_at"
+            )
+        ),
         "shops": [
             {
                 "id": shop.id,
@@ -426,6 +432,42 @@ def delete_workspace(request):
         user.delete()
     messages.success(request, "Your workspace, account, and FeeLoom data were permanently deleted.")
     return redirect("login")
+
+
+@login_required
+def beta_invites(request):
+    context = workspace_context(request)
+    membership = context["membership"]
+    if not is_workspace_owner(request, membership):
+        raise PermissionDenied
+    form = BetaInviteForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        invite = form.save_for(workspace=membership.workspace, user=request.user)
+        return redirect(f"{reverse('beta_invites')}?created={invite.id}")
+    invites = membership.workspace.beta_invites.select_related("created_by")
+    created_id = request.GET.get("created", "")
+    context.update(
+        {
+            "form": form,
+            "invites": invites,
+            "created_invite": invites.filter(id=created_id).first() if created_id.isdigit() else None,
+        }
+    )
+    return render(request, "dashboard/beta_invites.html", context)
+
+
+@login_required
+def toggle_invite(request, invite_id):
+    if request.method != "POST":
+        return redirect("beta_invites")
+    context = workspace_context(request)
+    membership = context["membership"]
+    if not is_workspace_owner(request, membership):
+        raise PermissionDenied
+    invite = get_object_or_404(BetaInvite, id=invite_id, workspace=membership.workspace)
+    invite.is_active = not invite.is_active
+    invite.save(update_fields=["is_active"])
+    return redirect("beta_invites")
 
 
 @login_required

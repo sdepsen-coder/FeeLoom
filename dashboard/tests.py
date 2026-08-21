@@ -1,4 +1,5 @@
 from decimal import Decimal
+from datetime import timedelta
 
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -6,7 +7,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from accounts.models import LegalAcceptance
+from accounts.models import BetaInvite, LegalAcceptance
 from integrations.models import EtsyConnection
 from sales.models import ImportBatch, Order, OrderItem, ProductCost
 from workspaces.models import Membership, Shop, Workspace
@@ -418,3 +419,58 @@ class DashboardTests(TestCase):
         self.assertTrue(
             Membership.objects.filter(user=self.user, workspace=other_workspace).exists()
         )
+
+    def test_owner_can_create_and_disable_beta_invite(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("beta_invites"),
+            {"label": "First tester", "max_uses": 2, "valid_for_days": 14},
+        )
+
+        invite = BetaInvite.objects.get(workspace=self.workspace)
+        self.assertRedirects(response, f"{reverse('beta_invites')}?created={invite.id}")
+        self.assertEqual(invite.max_uses, 2)
+        self.assertTrue(invite.is_available)
+
+        toggle_response = self.client.post(reverse("toggle_invite", args=[invite.id]))
+        invite.refresh_from_db()
+        self.assertRedirects(toggle_response, reverse("beta_invites"))
+        self.assertFalse(invite.is_active)
+
+    def test_manager_cannot_manage_beta_invites(self):
+        manager = User.objects.create_user(username="invite-manager")
+        Membership.objects.create(
+            workspace=self.workspace,
+            user=manager,
+            role=Membership.Role.MANAGER,
+        )
+        self.client.force_login(manager)
+
+        list_response = self.client.get(reverse("beta_invites"))
+        create_response = self.client.post(
+            reverse("beta_invites"),
+            {"label": "Unauthorized", "max_uses": 1, "valid_for_days": 7},
+        )
+
+        self.assertEqual(list_response.status_code, 403)
+        self.assertEqual(create_response.status_code, 403)
+        self.assertFalse(BetaInvite.objects.filter(label="Unauthorized").exists())
+
+    def test_owner_cannot_toggle_another_workspace_invite(self):
+        other_user = User.objects.create_user(username="invite-outsider")
+        other_workspace = Workspace.objects.create(
+            name="Invite Outside", slug="invite-outside", owner=other_user
+        )
+        outside_invite = BetaInvite.objects.create(
+            workspace=other_workspace,
+            created_by=other_user,
+            expires_at=timezone.now() + timedelta(days=7),
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(reverse("toggle_invite", args=[outside_invite.id]))
+
+        self.assertEqual(response.status_code, 404)
+        outside_invite.refresh_from_db()
+        self.assertTrue(outside_invite.is_active)

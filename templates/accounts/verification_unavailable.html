@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Email verification unavailable | FeeLoom{% endblock %}
+{% block content %}
+  <section class="auth-panel">
+    <p class="eyebrow">EMAIL VERIFICATION</p><h1>Verification email is not required</h1>
+    <p class="form-note">Email verification is not enabled for this beta environment.</p>
+    <a class="primary-button" href="{% url 'login' %}">Back to sign in</a>
+  </section>
+{% endblock %}

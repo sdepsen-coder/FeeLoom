@@ -5,6 +5,7 @@
     <p class="eyebrow">WELCOME BACK</p><h1>Sign in to FeeLoom</h1>
     <form method="post" class="stack-form">{% csrf_token %}{{ form.as_p }}{% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}<button class="primary-button" type="submit">Sign in</button></form>
     {% if email_delivery_enabled %}<p class="form-note"><a href="{% url 'password_reset' %}">Forgot your password?</a></p>{% endif %}
+    {% if email_verification_required %}<p class="form-note"><a href="{% url 'resend_verification' %}">Resend verification email</a></p>{% endif %}
     <p class="form-note">New to FeeLoom? <a href="{% url 'signup' %}">Create an account</a></p>
   </section>
 {% endblock %}

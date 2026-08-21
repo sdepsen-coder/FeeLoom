@@ -34,6 +34,13 @@ class SignupForm(UserCreationForm):
         return code
 
 
+class ResendVerificationForm(forms.Form):
+    email = forms.EmailField(label="Account email")
+
+    def clean_email(self):
+        return self.cleaned_data["email"].strip().lower()
+
+
 class BetaInviteForm(forms.ModelForm):
     valid_for_days = forms.TypedChoiceField(
         label="Valid for",

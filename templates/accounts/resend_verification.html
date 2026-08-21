@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Resend verification | FeeLoom{% endblock %}
+{% block content %}
+  <section class="auth-panel">
+    <p class="eyebrow">EMAIL VERIFICATION</p><h1>Send another link</h1>
+    <p class="form-note">Enter the email used for your FeeLoom account.</p>
+    <form method="post" class="stack-form">{% csrf_token %}{{ form.as_p }}<button class="primary-button" type="submit">Send verification link</button></form>
+    <p class="form-note"><a href="{% url 'login' %}">Back to sign in</a></p>
+  </section>
+{% endblock %}

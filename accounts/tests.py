@@ -1,6 +1,7 @@
 import re
 from django.contrib.auth.models import User
 from django.core import mail
+from django.core.cache import cache
 from django.test import TestCase
 from django.test import override_settings
 from django.urls import reverse
@@ -213,3 +214,32 @@ class SignupTests(TestCase):
         reused_response = self.client.get(verification_url)
         self.assertEqual(reused_response.status_code, 400)
         self.assertContains(reused_response, "no longer valid", status_code=400)
+
+    @override_settings(
+        EMAIL_DELIVERY_ENABLED=True,
+        EMAIL_VERIFICATION_REQUIRED=True,
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    )
+    def test_verification_email_can_be_resent_without_account_disclosure_or_spam(self):
+        cache.clear()
+        User.objects.create_user(
+            username="inactive-seller",
+            email="inactive@example.com",
+            password="strong-password-123",
+            is_active=False,
+        )
+
+        first_response = self.client.post(
+            reverse("resend_verification"), {"email": "inactive@example.com"}
+        )
+        second_response = self.client.post(
+            reverse("resend_verification"), {"email": "inactive@example.com"}
+        )
+        unknown_response = self.client.post(
+            reverse("resend_verification"), {"email": "unknown@example.com"}
+        )
+
+        self.assertRedirects(first_response, reverse("verification_resent"))
+        self.assertRedirects(second_response, reverse("verification_resent"))
+        self.assertRedirects(unknown_response, reverse("verification_resent"))
+        self.assertEqual(len(mail.outbox), 1)

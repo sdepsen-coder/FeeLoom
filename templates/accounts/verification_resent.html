@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Verification email requested | FeeLoom{% endblock %}
+{% block content %}
+  <section class="auth-panel">
+    <p class="eyebrow">EMAIL REQUESTED</p><h1>Check your inbox</h1>
+    <p class="form-note">If an inactive FeeLoom account uses that email, a new verification link is on its way.</p>
+    <a class="secondary-button" href="{% url 'login' %}">Back to sign in</a>
+  </section>
+{% endblock %}

@@ -5,6 +5,7 @@
     <p class="eyebrow">ONE MORE STEP</p><h1>Check your email</h1>
     <p class="form-note">We sent an activation link to {{ verification_email }}. Open it to activate your workspace and sign in.</p>
     <p class="form-note">Check your spam folder if the message does not arrive.</p>
+    <p class="form-note"><a href="{% url 'resend_verification' %}">Send another verification email</a></p>
     <a class="secondary-button" href="{% url 'login' %}">Back to sign in</a>
   </section>
 {% endblock %}

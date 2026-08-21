@@ -2,6 +2,7 @@ from django.contrib.auth import login
 from django.contrib.auth import views as auth_views
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.core.mail import send_mail
 from django.db import transaction
 from django.shortcuts import redirect, render
@@ -10,11 +11,12 @@ from django.urls import reverse, reverse_lazy
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.utils.text import slugify
+import hashlib
 
 from workspaces.models import Membership, Shop, Workspace
 from workspaces.selectors import ACTIVE_SHOP_SESSION_KEY
 
-from .forms import SignupForm
+from .forms import ResendVerificationForm, SignupForm
 from .models import BetaInvite, LegalAcceptance
 from .tokens import email_verification_token
 
@@ -134,3 +136,18 @@ def verify_email(request, uidb64, token):
             request.session[ACTIVE_SHOP_SESSION_KEY] = first_shop.id
         return redirect("getting_started")
     return render(request, "accounts/verification_invalid.html", status=400)
+
+
+def resend_verification(request):
+    if not settings.EMAIL_VERIFICATION_REQUIRED:
+        return render(request, "accounts/verification_unavailable.html")
+    form = ResendVerificationForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        email = form.cleaned_data["email"]
+        throttle_key = f"verification-email:{hashlib.sha256(email.encode()).hexdigest()}"
+        if cache.add(throttle_key, True, timeout=60):
+            user = User.objects.filter(email__iexact=email, is_active=False).first()
+            if user:
+                send_verification_email(request, user)
+        return redirect("verification_resent")
+    return render(request, "accounts/resend_verification.html", {"form": form})

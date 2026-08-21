@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Sales | FeeLoom{% endblock %}
 {% block content %}
-  <header class="page-heading"><div><p class="eyebrow">SALES</p><h1>Order profitability</h1></div><a class="secondary-button" href="{% url 'export_sales' %}?{{ request.GET.urlencode }}">Download CSV</a></header>
+  <header class="page-heading"><div><p class="eyebrow">SALES</p><h1>Order profitability</h1></div><div class="actions"><a class="primary-button" href="{% url 'import_sales' %}">Import sales</a><a class="secondary-button" href="{% url 'export_sales' %}?{{ request.GET.urlencode }}">Download CSV</a></div></header>
   <form class="filter-bar" method="get">
     <input type="search" name="q" value="{{ query }}" placeholder="Search order, product, or SKU" aria-label="Search sales">
     <select name="status" aria-label="Profit status"><option value="">All statuses</option>{% for value, label in profit_statuses %}<option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>

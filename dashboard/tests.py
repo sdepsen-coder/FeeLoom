@@ -1,11 +1,12 @@
 from decimal import Decimal
 
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from sales.models import Order, OrderItem, ProductCost
+from sales.models import ImportBatch, Order, OrderItem, ProductCost
 from workspaces.models import Membership, Shop, Workspace
 
 
@@ -107,3 +108,47 @@ class DashboardTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "text/csv")
         self.assertIn("ORDER-100", response.content.decode())
+
+    def test_csv_export_escapes_spreadsheet_formulas(self):
+        self.order.external_order_id = "=DANGEROUS()"
+        self.order.save(update_fields=["external_order_id"])
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("export_sales"))
+
+        self.assertIn("'=DANGEROUS()", response.content.decode())
+
+    def test_orders_csv_can_be_imported_from_dashboard(self):
+        self.client.force_login(self.user)
+        uploaded = SimpleUploadedFile(
+            "EtsySoldOrders2026.csv",
+            (
+                "Sale Date,Order ID,Number of Items,Currency,Order Value,"
+                "Discount Amount,Shipping,Card Processing Fees,SKU\n"
+                "08/16/2026,ETSY-300,1,USD,30.00,0,0,1.15,NEW-1\n"
+            ).encode(),
+            content_type="text/csv",
+        )
+
+        response = self.client.post(reverse("import_sales"), {"csv_file": uploaded})
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            Order.objects.filter(shop=self.shop, external_order_id="ETSY-300").exists()
+        )
+
+    def test_import_result_cannot_show_other_shop_batch(self):
+        other_user = User.objects.create_user(username="batch-owner")
+        other_workspace = Workspace.objects.create(
+            name="Batch Studio",
+            slug="batch-studio",
+            owner=other_user,
+        )
+        other_shop = Shop.objects.create(workspace=other_workspace, name="Batch Shop")
+        other_batch = ImportBatch.objects.create(shop=other_shop, file_name="private.csv")
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("import_sales"), {"batch": other_batch.id})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "private.csv")

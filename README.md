@@ -13,3 +13,9 @@ python -m venv .venv
 ```
 
 Demo login: `demo` / `demo12345`
+
+## Etsy order import
+
+In Etsy Shop Manager, open `Settings > Options > Download Data`, choose the
+`Orders` CSV type, and upload the downloaded file from FeeLoom's Import page.
+The repository includes `sample_data/EtsySoldOrdersSample.csv` for local testing.

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Import sales | FeeLoom{% endblock %}
+{% block content %}
+  <header class="page-heading"><div><p class="eyebrow">IMPORT</p><h1>Import Etsy orders</h1></div></header>
+  {% if selected_batch %}
+    <section class="import-result {% if selected_batch.status == 'failed' %}result-error{% endif %}">
+      <div><span>Imported</span><strong>{{ selected_batch.imported_rows }}</strong></div>
+      <div><span>Already present</span><strong>{{ selected_batch.skipped_rows }}</strong></div>
+      <div><span>Total rows</span><strong>{{ selected_batch.total_rows }}</strong></div>
+      {% if selected_batch.error_message %}<pre>{{ selected_batch.error_message }}</pre>{% endif %}
+    </section>
+  {% endif %}
+  <div class="split-layout import-layout">
+    <section class="form-panel">
+      <h2>Upload Orders CSV</h2>
+      <form method="post" enctype="multipart/form-data" class="stack-form">
+        {% csrf_token %}{{ form.as_p }}
+        {% if import_error %}<p class="form-error">{{ import_error }}</p>{% endif %}
+        <button class="primary-button" type="submit">Import orders</button>
+      </form>
+    </section>
+    <aside class="plain-panel">
+      <h2>Recent imports</h2>
+      <div class="import-list">
+        {% for batch in imports %}<a href="?batch={{ batch.id }}"><span>{{ batch.file_name }}</span><small>{{ batch.created_at|date:"M j, Y H:i" }} · {{ batch.imported_rows }} imported</small></a>{% empty %}<p class="form-note">No files imported yet.</p>{% endfor %}
+      </div>
+    </aside>
+  </div>
+  <p class="legal-note">The term "Etsy" is a trademark of Etsy, Inc. FeeLoom uses seller-exported data and is not endorsed or certified by Etsy, Inc.</p>
+{% endblock %}

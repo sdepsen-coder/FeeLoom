@@ -6,14 +6,20 @@ from django.db.models import Q, Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
-from sales.models import Order, ProductCost
+from sales.importers import CSVImportError, import_etsy_orders
+from sales.models import ImportBatch, Order, ProductCost
 from workspaces.selectors import current_membership, current_shop
 
-from .forms import ProductCostForm
+from .forms import EtsyCSVImportForm, ProductCostForm
 
 
 def money(value):
     return value or Decimal("0")
+
+
+def csv_safe(value):
+    text = str(value)
+    return f"'{text}" if text.startswith(("=", "+", "-", "@")) else text
 
 
 def workspace_context(request):
@@ -123,7 +129,7 @@ def export_sales(request):
         writer.writerow(
             [
                 order.ordered_at.isoformat(),
-                order.external_order_id,
+                csv_safe(order.external_order_id),
                 order.gross_sales,
                 order.marketplace_fees,
                 order.ad_fees,
@@ -175,4 +181,34 @@ def product_costs(request):
         request,
         "dashboard/costs.html",
         {"membership": membership, "shop": shop, "form": form, "costs": costs},
+    )
+
+
+@login_required
+def import_sales(request):
+    membership, shop = workspace_context(request)
+    form = EtsyCSVImportForm(request.POST or None, request.FILES or None)
+    import_error = ""
+    if request.method == "POST" and shop and form.is_valid():
+        try:
+            batch, _ = import_etsy_orders(shop, form.cleaned_data["csv_file"])
+            return redirect(f"{request.path}?batch={batch.id}")
+        except CSVImportError as exc:
+            import_error = str(exc)
+    selected_batch = None
+    batch_id = request.GET.get("batch")
+    if batch_id and batch_id.isdigit() and shop:
+        selected_batch = ImportBatch.objects.filter(shop=shop, id=batch_id).first()
+    imports = ImportBatch.objects.filter(shop=shop)[:10] if shop else ImportBatch.objects.none()
+    return render(
+        request,
+        "dashboard/import_sales.html",
+        {
+            "membership": membership,
+            "shop": shop,
+            "form": form,
+            "import_error": import_error,
+            "selected_batch": selected_batch,
+            "imports": imports,
+        },
     )

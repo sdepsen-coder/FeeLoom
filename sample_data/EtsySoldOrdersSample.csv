@@ -1,0 +1,3 @@
+Sale Date,Order ID,Number of Items,Currency,Order Value,Discount Amount,Shipping,Card Processing Fees,SKU
+08/20/2026,ETSY-SAMPLE-501,1,USD,36.00,0,0,1.33,MUG-001
+08/19/2026,ETSY-SAMPLE-500,2,USD,48.00,4.00,6.00,1.75,TAG-008

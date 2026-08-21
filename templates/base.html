@@ -36,7 +36,10 @@
           {% else %}<div><strong>FeeLoom</strong></div>{% endif %}
           <div class="topbar-meta">{% if membership %}<span>{{ membership.workspace.name }} · {{ membership.get_role_display }}</span>{% endif %}{% block topbar_actions %}{% endblock %}</div>
         </header>
-        <main class="page">{% block content %}{% endblock %}</main>
+        <main class="page">
+          {% if messages %}<div class="message-list">{% for message in messages %}<div class="message message-{{ message.tags }}">{{ message }}</div>{% endfor %}</div>{% endif %}
+          {% block content %}{% endblock %}
+        </main>
       </div>
     </div>
   </body>

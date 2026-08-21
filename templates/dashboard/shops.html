@@ -8,12 +8,17 @@
       <div class="shop-list">
         {% for workspace_shop in workspace_shops %}
           <article class="shop-row">
-            <div><strong>{{ workspace_shop.name }}</strong><span>{{ workspace_shop.get_marketplace_display }} · {{ workspace_shop.currency }}</span></div>
-            <div class="actions"><span class="status {% if workspace_shop.is_active %}status-profitable{% endif %}">{% if workspace_shop.is_active %}Active{% else %}Inactive{% endif %}</span>{% if can_manage_shops %}<form method="post" action="{% url 'toggle_shop' workspace_shop.id %}">{% csrf_token %}<button class="secondary-button compact" type="submit">{% if workspace_shop.is_active %}Deactivate{% else %}Activate{% endif %}</button></form>{% endif %}</div>
+            <div><strong>{{ workspace_shop.name }}</strong><span>{{ workspace_shop.get_marketplace_display }} · {{ workspace_shop.currency }}</span>{% if workspace_shop.etsy_connection %}<small>Connected{% if workspace_shop.etsy_connection.last_synced_at %} · Synced {{ workspace_shop.etsy_connection.last_synced_at|timesince }} ago{% endif %}</small>{% else %}<small>Manual CSV only</small>{% endif %}</div>
+            <div class="actions">
+              <span class="status {% if workspace_shop.etsy_connection %}status-profitable{% endif %}">{% if workspace_shop.etsy_connection %}Etsy connected{% else %}Not connected{% endif %}</span>
+              {% if can_manage_shops and workspace_shop.is_active %}{% if workspace_shop.etsy_connection %}<form method="post" action="{% url 'etsy_sync' workspace_shop.id %}">{% csrf_token %}<button class="primary-button compact" type="submit">Sync now</button></form><form method="post" action="{% url 'etsy_disconnect' workspace_shop.id %}">{% csrf_token %}<button class="text-button danger" type="submit">Disconnect</button></form>{% else %}<a class="primary-button compact" href="{% url 'etsy_connect' workspace_shop.id %}">Connect Etsy</a>{% endif %}{% endif %}
+              {% if can_manage_shops %}<form method="post" action="{% url 'toggle_shop' workspace_shop.id %}">{% csrf_token %}<button class="secondary-button compact" type="submit">{% if workspace_shop.is_active %}Deactivate{% else %}Activate{% endif %}</button></form>{% endif %}
+            </div>
           </article>
         {% empty %}<p class="empty-state">No shops yet.</p>{% endfor %}
       </div>
     </section>
     {% if can_manage_shops %}<aside class="form-panel"><h2>Add shop</h2><form method="post" class="stack-form">{% csrf_token %}{{ form.as_p }}<button class="primary-button" type="submit">Add shop</button></form></aside>{% endif %}
   </div>
+  <p class="legal-note">The term "Etsy" is a trademark of Etsy, Inc. FeeLoom is not endorsed or certified by Etsy, Inc.</p>
 {% endblock %}

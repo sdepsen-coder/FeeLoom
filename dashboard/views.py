@@ -221,7 +221,7 @@ def shops(request):
         {
             "form": form,
             "can_manage_shops": can_manage_shops(context["membership"]),
-            "workspace_shops": context["membership"].workspace.shops.all() if context["membership"] else [],
+            "workspace_shops": context["membership"].workspace.shops.select_related("etsy_connection").all() if context["membership"] else [],
         }
     )
     return render(request, "dashboard/shops.html", context)

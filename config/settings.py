@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'workspaces',
     'sales',
     'dashboard',
+    'integrations',
 ]
 
 MIDDLEWARE = [
@@ -155,3 +156,8 @@ CSRF_COOKIE_SECURE = not DEBUG
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+ETSY_API_KEY = os.environ.get("ETSY_API_KEY", "")
+ETSY_SHARED_SECRET = os.environ.get("ETSY_SHARED_SECRET", "")
+ETSY_REDIRECT_URI = os.environ.get("ETSY_REDIRECT_URI", "")
+FEELOOM_TOKEN_ENCRYPTION_KEY = os.environ.get("FEELOOM_TOKEN_ENCRYPTION_KEY", "")

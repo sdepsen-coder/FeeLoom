@@ -22,3 +22,11 @@ services:
         value: feeloom-web.onrender.com
       - key: DJANGO_CSRF_TRUSTED_ORIGINS
         value: https://feeloom-web.onrender.com
+      - key: FEELOOM_TOKEN_ENCRYPTION_KEY
+        generateValue: true
+      - key: ETSY_API_KEY
+        sync: false
+      - key: ETSY_SHARED_SECRET
+        sync: false
+      - key: ETSY_REDIRECT_URI
+        value: https://feeloom-web.onrender.com/integrations/etsy/callback/

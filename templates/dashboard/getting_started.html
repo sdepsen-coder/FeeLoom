@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Getting started | FeeLoom{% endblock %}
+{% block content %}
+  <header class="page-heading"><div><p class="eyebrow">SETUP</p><h1>Getting started</h1></div><span class="setup-count">{{ completed_steps }} of {{ total_steps }} complete</span></header>
+  <div class="setup-layout">
+    <section class="setup-list" aria-label="Setup progress">
+      {% for step in setup_steps %}
+        <article class="setup-step {% if step.done %}step-done{% endif %}"><span class="step-marker">{% if step.done %}&#10003;{% else %}{{ forloop.counter }}{% endif %}</span><strong>{{ step.label }}</strong><a class="secondary-button compact" href="{{ step.url }}">{% if step.done %}Review{% else %}Open{% endif %}</a></article>
+      {% endfor %}
+    </section>
+    <aside class="form-panel sample-panel"><h2>Try sample orders</h2><p>Use a safe two-order Etsy CSV before importing real sales.</p><a class="secondary-button" href="{% url 'download_sample_csv' %}">Download sample CSV</a><a class="primary-button" href="{% url 'import_sales' %}">Import orders</a></aside>
+  </div>
+  {% if setup_complete %}<section class="setup-complete"><strong>Setup complete.</strong><a href="{% url 'dashboard' %}">Open profit overview</a></section>{% endif %}
+{% endblock %}

@@ -1,10 +1,12 @@
 import csv
 from decimal import Decimal
+from pathlib import Path
 
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q, Sum
-from django.http import HttpResponse
+from django.http import FileResponse, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -110,6 +112,7 @@ def dashboard(request):
             "margin": net_profit / gross_sales * 100 if gross_sales else Decimal("0"),
             "loss_count": orders.filter(profit_status=Order.ProfitStatus.LOSS).count(),
             "recent_orders": orders.select_related("shop").prefetch_related("items")[:8],
+            "show_getting_started": not orders.exists(),
         }
     )
     return render(request, "dashboard/home.html", context)
@@ -261,3 +264,38 @@ def feedback(request):
         return redirect(f"{reverse('feedback')}?sent=1")
     context.update({"form": form, "feedback_sent": request.GET.get("sent") == "1"})
     return render(request, "dashboard/feedback.html", context)
+
+
+@login_required
+def getting_started(request):
+    context = workspace_context(request)
+    if not context["membership"]:
+        raise PermissionDenied
+    active_shops = context["shops"]
+    has_costs = ProductCost.objects.filter(shop__in=active_shops).exists()
+    has_orders = Order.objects.filter(shop__in=active_shops).exists()
+    steps = [
+        {"label": "Shop created", "done": bool(active_shops), "url": reverse("shops")},
+        {"label": "Product costs added", "done": has_costs, "url": reverse("product_costs")},
+        {"label": "Orders imported", "done": has_orders, "url": reverse("import_sales")},
+    ]
+    context.update(
+        {
+            "setup_steps": steps,
+            "completed_steps": sum(step["done"] for step in steps),
+            "total_steps": len(steps),
+            "setup_complete": all(step["done"] for step in steps),
+        }
+    )
+    return render(request, "dashboard/getting_started.html", context)
+
+
+@login_required
+def download_sample_csv(request):
+    sample_path = Path(settings.BASE_DIR) / "sample_data" / "EtsySoldOrdersSample.csv"
+    return FileResponse(
+        sample_path.open("rb"),
+        as_attachment=True,
+        filename="FeeLoom-Etsy-Orders-Sample.csv",
+        content_type="text/csv",
+    )

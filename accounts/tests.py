@@ -24,7 +24,7 @@ class SignupTests(TestCase):
         workspace = Workspace.objects.get(owner=user)
         membership = Membership.objects.get(workspace=workspace, user=user)
         shop = Shop.objects.get(workspace=workspace)
-        self.assertRedirects(response, reverse("dashboard"))
+        self.assertRedirects(response, reverse("getting_started"))
         self.assertEqual(workspace.name, "Maker Studio")
         self.assertEqual(shop.name, "Studio Gifts")
         self.assertEqual(membership.role, Membership.Role.OWNER)

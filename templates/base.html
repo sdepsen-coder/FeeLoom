@@ -14,6 +14,7 @@
         {% if request.user.is_authenticated %}
           <nav class="side-nav" aria-label="Workspace">
             <a class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">Overview</a>
+            <a class="{% if request.resolver_match.url_name == 'getting_started' %}active{% endif %}" href="{% url 'getting_started' %}">Getting started</a>
             <a class="{% if request.resolver_match.url_name == 'sales_table' or request.resolver_match.url_name == 'sale_detail' %}active{% endif %}" href="{% url 'sales_table' %}">Sales</a>
             <a class="{% if request.resolver_match.url_name == 'import_sales' %}active{% endif %}" href="{% url 'import_sales' %}">Import</a>
             <a class="{% if request.resolver_match.url_name == 'product_costs' %}active{% endif %}" href="{% url 'product_costs' %}">Product costs</a>

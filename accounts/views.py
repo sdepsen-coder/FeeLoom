@@ -45,6 +45,6 @@ def signup(request):
             )
         login(request, user)
         request.session[ACTIVE_SHOP_SESSION_KEY] = shop.id
-        return redirect("dashboard")
+        return redirect("getting_started")
 
     return render(request, "accounts/signup.html", {"form": form})

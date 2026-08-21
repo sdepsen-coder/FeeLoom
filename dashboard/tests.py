@@ -293,3 +293,23 @@ class DashboardTests(TestCase):
         )
 
         self.assertEqual(Feedback.objects.get().page_path, "")
+
+    def test_getting_started_shows_workspace_progress(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("getting_started"))
+
+        self.assertContains(response, "2 of 3 complete")
+        self.assertContains(response, "Shop created")
+        self.assertContains(response, "Orders imported")
+
+    def test_sample_etsy_csv_can_be_downloaded(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("download_sample_csv"))
+        content = b"".join(response.streaming_content)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/csv")
+        self.assertIn("attachment", response["Content-Disposition"])
+        self.assertIn(b"Order ID", content)

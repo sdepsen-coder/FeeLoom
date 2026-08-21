@@ -35,6 +35,9 @@ remaining SMTP settings are listed in `.env.example`.
 On production, new accounts require email verification whenever email delivery
 is configured. Verification links are single-use and activate the workspace on
 first use.
+
+Public authentication endpoints use cache-backed fixed-window rate limits for
+login failures, signup attempts, password resets, and verification email requests.
 FeeLoom requests read-only `shops_r` and `transactions_r` scopes. Owners and managers
 can then connect each shop and run an incremental order sync from the Shops page.
 

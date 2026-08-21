@@ -16,6 +16,7 @@ from .models import BetaInvite, LegalAcceptance
 @override_settings(EMAIL_VERIFICATION_REQUIRED=False)
 class SignupTests(TestCase):
     def setUp(self):
+        cache.clear()
         issuer = User.objects.create_user(username="beta-owner")
         issuer_workspace = Workspace.objects.create(
             name="Beta Studio", slug="beta-studio", owner=issuer
@@ -243,3 +244,41 @@ class SignupTests(TestCase):
         self.assertRedirects(second_response, reverse("verification_resent"))
         self.assertRedirects(unknown_response, reverse("verification_resent"))
         self.assertEqual(len(mail.outbox), 1)
+
+    @override_settings(
+        LOGIN_IDENTITY_FAILURE_LIMIT=2,
+        LOGIN_IP_FAILURE_LIMIT=10,
+        PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"],
+    )
+    def test_login_blocks_repeated_failures_for_same_identity(self):
+        cache.clear()
+        User.objects.create_user(
+            username="protected-seller", password="correct-password"
+        )
+        for _ in range(2):
+            response = self.client.post(
+                reverse("login"),
+                {"username": "protected-seller", "password": "wrong-password"},
+            )
+            self.assertEqual(response.status_code, 200)
+
+        blocked_response = self.client.post(
+            reverse("login"),
+            {"username": "protected-seller", "password": "correct-password"},
+        )
+
+        self.assertEqual(blocked_response.status_code, 429)
+        self.assertEqual(blocked_response["Retry-After"], "900")
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    @override_settings(SIGNUP_IP_LIMIT=2)
+    def test_signup_rate_limit_blocks_automated_attempts(self):
+        cache.clear()
+        for _ in range(2):
+            response = self.client.post(reverse("signup"), {})
+            self.assertEqual(response.status_code, 200)
+
+        blocked_response = self.client.post(reverse("signup"), {})
+
+        self.assertEqual(blocked_response.status_code, 429)
+        self.assertContains(blocked_response, "Please wait and try again", status_code=429)

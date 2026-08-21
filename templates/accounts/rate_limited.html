@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Please wait | FeeLoom{% endblock %}
+{% block content %}
+  <section class="auth-panel">
+    <p class="eyebrow">TOO MANY REQUESTS</p><h1>Please wait and try again</h1>
+    <p class="form-note">FeeLoom temporarily paused this action to protect your account. Try again in about {{ retry_after_minutes }} minutes.</p>
+    <a class="secondary-button" href="{% url 'login' %}">Back to sign in</a>
+  </section>
+{% endblock %}

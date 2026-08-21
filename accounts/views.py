@@ -18,7 +18,37 @@ from workspaces.selectors import ACTIVE_SHOP_SESSION_KEY
 
 from .forms import ResendVerificationForm, SignupForm
 from .models import BetaInvite, LegalAcceptance
+from .rate_limits import client_ip, clear_limit, is_limited, rate_limited_response, record_hit
 from .tokens import email_verification_token
+
+
+class FeeLoomLoginView(auth_views.LoginView):
+    template_name = "registration/login.html"
+
+    def rate_values(self):
+        username = self.request.POST.get("username", "").strip().lower()
+        ip = client_ip(self.request)
+        return ip, f"{ip}:{username}"
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.method == "POST":
+            ip, identity = self.rate_values()
+            if is_limited("login-ip", ip, settings.LOGIN_IP_FAILURE_LIMIT) or is_limited(
+                "login-identity", identity, settings.LOGIN_IDENTITY_FAILURE_LIMIT
+            ):
+                return rate_limited_response(request, settings.LOGIN_FAILURE_WINDOW)
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_invalid(self, form):
+        ip, identity = self.rate_values()
+        record_hit("login-ip", ip, settings.LOGIN_FAILURE_WINDOW)
+        record_hit("login-identity", identity, settings.LOGIN_FAILURE_WINDOW)
+        return super().form_invalid(form)
+
+    def form_valid(self, form):
+        _, identity = self.rate_values()
+        clear_limit("login-identity", identity)
+        return super().form_valid(form)
 
 
 class FeeLoomPasswordResetView(auth_views.PasswordResetView):
@@ -30,6 +60,15 @@ class FeeLoomPasswordResetView(auth_views.PasswordResetView):
     def dispatch(self, request, *args, **kwargs):
         if not settings.EMAIL_DELIVERY_ENABLED:
             return render(request, "registration/password_reset_unavailable.html")
+        if request.method == "POST":
+            email = request.POST.get("email", "").strip().lower()
+            ip = client_ip(request)
+            if is_limited("reset-ip", ip, settings.EMAIL_REQUEST_IP_LIMIT) or is_limited(
+                "reset-email", email, settings.EMAIL_REQUEST_ADDRESS_LIMIT
+            ):
+                return rate_limited_response(request, settings.EMAIL_REQUEST_RATE_WINDOW)
+            record_hit("reset-ip", ip, settings.EMAIL_REQUEST_RATE_WINDOW)
+            record_hit("reset-email", email, settings.EMAIL_REQUEST_RATE_WINDOW)
         return super().dispatch(request, *args, **kwargs)
 
 
@@ -65,6 +104,11 @@ def unique_workspace_slug(name):
 def signup(request):
     if request.user.is_authenticated:
         return redirect("dashboard")
+    if request.method == "POST":
+        ip = client_ip(request)
+        if is_limited("signup-ip", ip, settings.SIGNUP_IP_LIMIT):
+            return rate_limited_response(request, settings.SIGNUP_RATE_WINDOW)
+        record_hit("signup-ip", ip, settings.SIGNUP_RATE_WINDOW)
 
     form = SignupForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -144,6 +188,13 @@ def resend_verification(request):
     form = ResendVerificationForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         email = form.cleaned_data["email"]
+        ip = client_ip(request)
+        if is_limited("verify-ip", ip, settings.EMAIL_REQUEST_IP_LIMIT) or is_limited(
+            "verify-address", email, settings.EMAIL_REQUEST_ADDRESS_LIMIT
+        ):
+            return rate_limited_response(request, settings.EMAIL_REQUEST_RATE_WINDOW)
+        record_hit("verify-ip", ip, settings.EMAIL_REQUEST_RATE_WINDOW)
+        record_hit("verify-address", email, settings.EMAIL_REQUEST_RATE_WINDOW)
         throttle_key = f"verification-email:{hashlib.sha256(email.encode()).hexdigest()}"
         if cache.add(throttle_key, True, timeout=60):
             user = User.objects.filter(email__iexact=email, is_active=False).first()

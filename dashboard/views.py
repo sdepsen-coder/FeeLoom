@@ -350,6 +350,27 @@ def feedback(request):
             action="feedback.submitted",
             summary="Beta feedback submitted",
         )
+        if settings.EMAIL_DELIVERY_ENABLED and settings.FEELOOM_SUPPORT_EMAIL:
+            try:
+                send_mail(
+                    f"FeeLoom beta feedback: {submission.get_category_display()}",
+                    "\n".join(
+                        [
+                            f"Workspace: {submission.workspace.name}",
+                            f"Shop: {submission.shop.name if submission.shop else '-'}",
+                            f"User: {request.user.username}",
+                            f"Rating: {submission.rating}/5",
+                            f"Page: {submission.page_path or '-'}",
+                            "",
+                            submission.message,
+                        ]
+                    ),
+                    settings.DEFAULT_FROM_EMAIL,
+                    [settings.FEELOOM_SUPPORT_EMAIL],
+                    fail_silently=False,
+                )
+            except Exception:
+                logger.exception("feedback_notification_failed")
         return redirect(f"{reverse('feedback')}?sent=1")
     context.update({"form": form, "feedback_sent": request.GET.get("sent") == "1"})
     return render(request, "dashboard/feedback.html", context)

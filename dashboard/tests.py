@@ -390,7 +390,13 @@ class DashboardTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Order.objects.filter(external_order_id="PRIVATE-1").exists())
 
-    def test_feedback_is_saved_to_current_workspace_and_shop(self):
+    @override_settings(
+        EMAIL_DELIVERY_ENABLED=True,
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        DEFAULT_FROM_EMAIL="FeeLoom <account@example.com>",
+        FEELOOM_SUPPORT_EMAIL="support@example.com",
+    )
+    def test_feedback_is_saved_and_support_is_notified(self):
         self.client.force_login(self.user)
 
         response = self.client.post(
@@ -409,6 +415,32 @@ class DashboardTests(TestCase):
         self.assertEqual(submission.shop, self.shop)
         self.assertEqual(submission.user, self.user)
         self.assertEqual(submission.page_path, "/sales/1/")
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["support@example.com"])
+        self.assertIn("Calculation", mail.outbox[0].subject)
+        self.assertIn("The fee total needs a clearer breakdown.", mail.outbox[0].body)
+
+    @override_settings(
+        EMAIL_DELIVERY_ENABLED=True,
+        FEELOOM_SUPPORT_EMAIL="support@example.com",
+    )
+    @patch("dashboard.views.send_mail", side_effect=RuntimeError("provider unavailable"))
+    def test_feedback_is_saved_when_notification_fails(self, send_mail_mock):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("feedback"),
+            {
+                "category": Feedback.Category.BUG,
+                "rating": 2,
+                "message": "The filter stopped responding.",
+                "page_path": "/sales/",
+            },
+        )
+
+        self.assertRedirects(response, f"{reverse('feedback')}?sent=1")
+        self.assertTrue(Feedback.objects.filter(message="The filter stopped responding.").exists())
+        send_mail_mock.assert_called_once()
 
     def test_feedback_rating_scale_is_explained(self):
         self.client.force_login(self.user)

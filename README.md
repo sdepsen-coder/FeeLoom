@@ -84,6 +84,11 @@ an SMTP key, and a verified sender address through the existing email environmen
 variables. A superuser can then open `/system-status/` and send a delivery test;
 secret values are never displayed by the page.
 
+For an existing Render Blueprint, add the new secret values manually on the web
+service's Environment page. Render only prompts for `sync: false` values when a
+Blueprint creates a service for the first time. The non-secret Brevo host, port,
+and TLS settings are managed by `render.yaml`.
+
 ## Render preview
 
 The Blueprint provisions a free web service and free PostgreSQL database. Render

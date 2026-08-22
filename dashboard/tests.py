@@ -1,5 +1,6 @@
 import sqlite3
 import tempfile
+import os
 from datetime import timedelta
 from decimal import Decimal
 from io import StringIO
@@ -27,6 +28,57 @@ from workspaces.selectors import ACTIVE_SHOP_SESSION_KEY, ALL_SHOPS_VALUE
 
 from .models import AuditEvent, Feedback
 from .management.commands.backup_database import Command as BackupDatabaseCommand
+
+
+class BootstrapAdminCommandTests(TestCase):
+    def test_command_is_inert_by_default(self):
+        output = StringIO()
+
+        call_command("bootstrap_admin", stdout=output)
+
+        self.assertFalse(User.objects.filter(is_superuser=True).exists())
+        self.assertIn("disabled", output.getvalue())
+
+    @patch.dict(
+        os.environ,
+        {
+            "FEELOOM_BOOTSTRAP_ADMIN_ON_START": "true",
+            "FEELOOM_BOOTSTRAP_ADMIN_USERNAME": "launch-admin",
+            "FEELOOM_BOOTSTRAP_ADMIN_EMAIL": "admin@example.com",
+            "FEELOOM_BOOTSTRAP_ADMIN_PASSWORD": "Launch-pass-482!",
+        },
+        clear=False,
+    )
+    def test_command_creates_superuser_without_printing_password(self):
+        output = StringIO()
+
+        call_command("bootstrap_admin", stdout=output)
+
+        user = User.objects.get(username="launch-admin")
+        self.assertTrue(user.is_active)
+        self.assertTrue(user.is_staff)
+        self.assertTrue(user.is_superuser)
+        self.assertTrue(user.check_password("Launch-pass-482!"))
+        self.assertNotIn("Launch-pass-482!", output.getvalue())
+
+    @patch.dict(
+        os.environ,
+        {
+            "FEELOOM_BOOTSTRAP_ADMIN_ON_START": "true",
+            "FEELOOM_BOOTSTRAP_ADMIN_USERNAME": "seller",
+            "FEELOOM_BOOTSTRAP_ADMIN_EMAIL": "seller@example.com",
+            "FEELOOM_BOOTSTRAP_ADMIN_PASSWORD": "Launch-pass-593!",
+        },
+        clear=False,
+    )
+    def test_command_promotes_existing_user(self):
+        User.objects.create_user(username="seller", password="old-password-123")
+
+        call_command("bootstrap_admin")
+
+        user = User.objects.get(username="seller")
+        self.assertTrue(user.is_superuser)
+        self.assertTrue(user.check_password("Launch-pass-593!"))
 
 
 class DashboardTests(TestCase):

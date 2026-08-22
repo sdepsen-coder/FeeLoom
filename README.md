@@ -89,6 +89,12 @@ service's Environment page. Render only prompts for `sync: false` values when a
 Blueprint creates a service for the first time. The non-secret Brevo host, port,
 and TLS settings are managed by `render.yaml`.
 
+Free Render services can bootstrap a first administrator without shell access.
+Temporarily set `FEELOOM_BOOTSTRAP_ADMIN_ON_START=true` together with the admin
+username, email, and a strong password variables listed in `render.yaml`, then
+deploy once. After login succeeds, set the switch to `false` and remove the
+bootstrap password from Render.
+
 ## Render preview
 
 The Blueprint provisions a free web service and free PostgreSQL database. Render

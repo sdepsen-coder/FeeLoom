@@ -109,6 +109,15 @@ class DashboardTests(TestCase):
         self.assertContains(response, 'id="workspace-nav"')
         self.assertContains(response, "Sign out", count=2)
 
+    def test_sales_table_has_mobile_profit_labels(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("sales_table"))
+
+        self.assertContains(response, 'class="order-table"')
+        self.assertContains(response, 'data-label="Net profit"')
+        self.assertContains(response, 'data-label="Margin"')
+
     def test_other_workspace_order_is_hidden(self):
         other_user = User.objects.create_user(username="other")
         other_workspace = Workspace.objects.create(

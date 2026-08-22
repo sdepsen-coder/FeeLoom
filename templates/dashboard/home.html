@@ -2,7 +2,7 @@
 {% block title %}Overview | FeeLoom{% endblock %}
 {% block topbar_actions %}<a class="primary-button compact" href="{% url 'sales_table' %}">View sales</a>{% endblock %}
 {% block content %}
-  <header class="page-heading"><div><p class="eyebrow">PROFIT OVERVIEW</p><h1>Know what every sale keeps.</h1></div></header>
+  <header class="page-heading"><div><p class="eyebrow">PROFIT OVERVIEW</p><h1>See what every sale actually earns.</h1></div></header>
   {% if show_getting_started %}<section class="setup-banner"><div><strong>Your workspace is ready.</strong><span>Complete setup to see your first profit report.</span></div><a class="primary-button" href="{% url 'getting_started' %}">Continue setup</a></section>{% endif %}
   <section class="metric-grid" aria-label="Profit summary">
     <article class="metric"><span>Gross sales</span><strong>{{ display_currency }} {{ gross_sales|floatformat:2 }}</strong></article>

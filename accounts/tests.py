@@ -271,6 +271,14 @@ class SignupTests(TestCase):
         self.assertEqual(blocked_response["Retry-After"], "900")
         self.assertNotIn("_auth_user_id", self.client.session)
 
+    def test_authenticated_user_is_redirected_away_from_login(self):
+        user = User.objects.create_user(username="signed-in-seller")
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("login"))
+
+        self.assertRedirects(response, reverse("dashboard"))
+
     @override_settings(SIGNUP_IP_LIMIT=2)
     def test_signup_rate_limit_blocks_automated_attempts(self):
         cache.clear()

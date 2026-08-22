@@ -25,6 +25,7 @@ from .tokens import email_verification_token
 
 class FeeLoomLoginView(auth_views.LoginView):
     template_name = "registration/login.html"
+    redirect_authenticated_user = True
 
     def rate_values(self):
         username = self.request.POST.get("username", "").strip().lower()

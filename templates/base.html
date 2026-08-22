@@ -13,6 +13,7 @@
         <a class="brand" href="{% url 'dashboard' %}"><span class="brand-mark">F</span><span>FeeLoom</span></a>
         {% if request.user.is_authenticated %}
           <nav class="side-nav" aria-label="Workspace">
+            {% if membership %}
             <a class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">Overview</a>
             <a class="{% if request.resolver_match.url_name == 'getting_started' %}active{% endif %}" href="{% url 'getting_started' %}">Getting started</a>
             <a class="{% if request.resolver_match.url_name == 'sales_table' or request.resolver_match.url_name == 'sale_detail' %}active{% endif %}" href="{% url 'sales_table' %}">Sales</a>
@@ -23,6 +24,7 @@
             <a class="{% if request.resolver_match.url_name == 'privacy_data' or request.resolver_match.url_name == 'delete_workspace' %}active{% endif %}" href="{% url 'privacy_data' %}">Privacy &amp; data</a>
             {% if membership.role == 'owner' %}<a class="{% if request.resolver_match.url_name == 'beta_invites' %}active{% endif %}" href="{% url 'beta_invites' %}">Beta invites</a>{% endif %}
             {% if membership.role == 'owner' %}<a class="{% if request.resolver_match.url_name == 'activity' %}active{% endif %}" href="{% url 'activity' %}">Activity</a>{% endif %}
+            {% endif %}
             {% if request.user.is_superuser %}<a class="{% if request.resolver_match.url_name == 'system_status' %}active{% endif %}" href="{% url 'system_status' %}">System</a>{% endif %}
           </nav>
           <div class="sidebar-footer"><span>{{ request.user.username }}</span><form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="text-button" type="submit">Sign out</button></form></div>

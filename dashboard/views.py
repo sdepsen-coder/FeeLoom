@@ -103,6 +103,9 @@ def switch_shop(request):
 @login_required
 def dashboard(request):
     context = workspace_context(request)
+    if not context["membership"]:
+        context["support_email"] = settings.FEELOOM_SUPPORT_EMAIL
+        return render(request, "dashboard/no_workspace.html", context)
     orders = selected_orders(context)
     totals = orders.aggregate(
         item_revenue=Sum("item_revenue"),
@@ -139,8 +142,18 @@ def dashboard(request):
 def sales_table(request):
     context = workspace_context(request)
     orders, query, status = filtered_sales(request, context)
+    sales_page = Paginator(orders, 25).get_page(request.GET.get("page"))
+    filter_params = request.GET.copy()
+    filter_params.pop("page", None)
     context.update(
-        {"orders": orders, "query": query, "selected_status": status, "profit_statuses": Order.ProfitStatus.choices}
+        {
+            "orders": sales_page.object_list,
+            "sales_page": sales_page,
+            "filter_query": filter_params.urlencode(),
+            "query": query,
+            "selected_status": status,
+            "profit_statuses": Order.ProfitStatus.choices,
+        }
     )
     return render(request, "dashboard/sales.html", context)
 

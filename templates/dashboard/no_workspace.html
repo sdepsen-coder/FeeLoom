@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Workspace unavailable | FeeLoom{% endblock %}
+{% block content %}
+  <div class="auth-panel wide">
+    <p class="eyebrow">ACCOUNT STATUS</p>
+    <h1>No active workspace</h1>
+    <p class="form-note">Your account is signed in, but it is not connected to an active FeeLoom workspace.</p>
+    {% if support_email %}<p class="form-note">Contact <a href="mailto:{{ support_email }}">{{ support_email }}</a> to restore access.</p>{% else %}<p class="form-note">Contact the FeeLoom beta administrator to restore access.</p>{% endif %}
+  </div>
+{% endblock %}

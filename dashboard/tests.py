@@ -69,6 +69,16 @@ class DashboardTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse("login"), response["Location"])
 
+    def test_authenticated_user_without_workspace_gets_safe_empty_state(self):
+        orphan = User.objects.create_user(username="orphan-seller")
+        self.client.force_login(orphan)
+
+        response = self.client.get(reverse("dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No active workspace")
+        self.assertNotContains(response, "Sales")
+
     def test_health_check_is_public_and_checks_database(self):
         response = self.client.get(reverse("health_check"))
 
@@ -137,6 +147,30 @@ class DashboardTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "text/csv")
         self.assertIn("ORDER-100", response.content.decode())
+
+    def test_sales_are_paginated_and_filters_survive_page_navigation(self):
+        for index in range(30):
+            Order.objects.create(
+                shop=self.shop,
+                external_order_id=f"BATCH-{index:02d}",
+                ordered_at=timezone.now() - timedelta(minutes=index + 1),
+                profit_status=Order.ProfitStatus.PROFITABLE,
+            )
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            reverse("sales_table"),
+            {"q": "BATCH", "status": Order.ProfitStatus.PROFITABLE, "page": 2},
+        )
+
+        self.assertEqual(response.context["sales_page"].number, 2)
+        self.assertEqual(response.context["sales_page"].paginator.count, 30)
+        self.assertEqual(
+            response.context["filter_query"],
+            "q=BATCH&status=profitable",
+        )
+        self.assertContains(response, "BATCH-29")
+        self.assertNotContains(response, "BATCH-00")
 
     def test_csv_export_escapes_spreadsheet_formulas(self):
         self.order.external_order_id = "=DANGEROUS()"

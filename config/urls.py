@@ -19,6 +19,10 @@ from django.urls import include, path
 
 from .views import health_check, privacy_policy, terms_of_service
 
+handler403 = "config.views.permission_denied"
+handler404 = "config.views.page_not_found"
+handler500 = "config.views.server_error"
+
 urlpatterns = [
     path('health/', health_check, name='health_check'),
     path('privacy/', privacy_policy, name='privacy_policy'),

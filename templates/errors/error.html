@@ -1,0 +1,24 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ error_title }} | FeeLoom</title>
+    <link rel="stylesheet" href="{% static 'app.css' %}?v=20260822-3">
+  </head>
+  <body>
+    <div class="error-shell">
+      <header class="error-header">
+        <a class="brand" href="/"><span class="brand-mark">F</span><span>FeeLoom</span></a>
+      </header>
+      <main class="error-main">
+        <div class="error-code">ERROR {{ error_code }}</div>
+        <h1>{{ error_title }}</h1>
+        <p>{{ error_message }}</p>
+        <a class="primary-button" href="{{ action_url }}">{{ action_label }}</a>
+      </main>
+      <footer class="error-footer"><span>FeeLoom beta</span></footer>
+    </div>
+  </body>
+</html>

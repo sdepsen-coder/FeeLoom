@@ -146,6 +146,9 @@ class SignupTests(TestCase):
         self.assertIn("Reset your FeeLoom password", mail.outbox[0].subject)
         self.assertIn("/accounts/reset/", mail.outbox[0].body)
         self.assertIn(user.email, mail.outbox[0].to)
+        self.assertEqual(len(mail.outbox[0].alternatives), 1)
+        self.assertIn("Reset password", mail.outbox[0].alternatives[0].content)
+        self.assertEqual(mail.outbox[0].alternatives[0].mimetype, "text/html")
 
         reset_url = re.search(r"http://testserver(\S+)", mail.outbox[0].body).group(1)
         confirm_response = self.client.get(reset_url)
@@ -202,6 +205,9 @@ class SignupTests(TestCase):
         self.assertFalse(user.is_active)
         self.assertNotIn("_auth_user_id", self.client.session)
         self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(len(mail.outbox[0].alternatives), 1)
+        self.assertIn("Verify email", mail.outbox[0].alternatives[0].content)
+        self.assertEqual(mail.outbox[0].alternatives[0].mimetype, "text/html")
 
         verification_url = re.search(
             r"http://testserver(\S+)", mail.outbox[0].body

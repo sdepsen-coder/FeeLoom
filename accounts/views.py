@@ -56,6 +56,7 @@ class FeeLoomLoginView(auth_views.LoginView):
 class FeeLoomPasswordResetView(auth_views.PasswordResetView):
     template_name = "registration/password_reset_form.html"
     email_template_name = "registration/password_reset_email.txt"
+    html_email_template_name = "registration/password_reset_email.html"
     subject_template_name = "registration/password_reset_subject.txt"
     success_url = reverse_lazy("password_reset_done")
 
@@ -84,12 +85,17 @@ def send_verification_email(request, user):
         "accounts/verification_email.txt",
         {"user": user, "verification_url": verification_url},
     )
+    html_message = render_to_string(
+        "accounts/verification_email.html",
+        {"user": user, "verification_url": verification_url},
+    )
     send_mail(
         "Verify your FeeLoom email",
         message,
         settings.DEFAULT_FROM_EMAIL,
         [user.email],
         fail_silently=False,
+        html_message=html_message,
     )
 
 

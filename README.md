@@ -79,9 +79,10 @@ configuration state only and never prints secret values. Remove `--no-fail` in a
 deployment pipeline when blockers should stop a release.
 
 For the beta email service, Brevo SMTP can be used without application code
-changes. Configure `smtp-relay.brevo.com` on port `587`, the Brevo SMTP login,
+changes. Configure `smtp-relay.brevo.com` on port `2525`, the Brevo SMTP login,
 an SMTP key, and a verified sender address through the existing email environment
-variables. A superuser can then open `/system-status/` and send a delivery test;
+variables. Port `2525` is used because free Render web services block the standard
+SMTP ports. A superuser can then open `/system-status/` and send a delivery test;
 secret values are never displayed by the page.
 
 For an existing Render Blueprint, add the new secret values manually on the web

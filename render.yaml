@@ -24,7 +24,7 @@ services:
       - key: EMAIL_HOST
         value: smtp-relay.brevo.com
       - key: EMAIL_PORT
-        value: 587
+        value: 2525
       - key: EMAIL_USE_TLS
         value: true
       - key: EMAIL_USE_SSL

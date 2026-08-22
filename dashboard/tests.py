@@ -131,6 +131,21 @@ class DashboardTests(TestCase):
         self.assertContains(response, "No active workspace")
         self.assertNotContains(response, "Sales")
 
+    def test_superuser_without_workspace_gets_operations_link(self):
+        admin = User.objects.create_superuser(
+            username="operations-admin",
+            email="admin@example.com",
+            password="strong-admin-password-123",
+        )
+        self.client.force_login(admin)
+
+        response = self.client.get(reverse("dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Operations account")
+        self.assertContains(response, reverse("system_status"))
+        self.assertNotContains(response, "Contact admin@example.com")
+
     def test_health_check_is_public_and_checks_database(self):
         response = self.client.get(reverse("health_check"))
 

@@ -557,7 +557,9 @@ class DashboardTests(TestCase):
             Membership.objects.filter(user=self.user, workspace=other_workspace).exists()
         )
 
-    def test_owner_can_create_and_disable_beta_invite(self):
+    def test_staff_owner_can_create_and_disable_beta_invite(self):
+        self.user.is_staff = True
+        self.user.save(update_fields=["is_staff"])
         self.client.force_login(self.user)
 
         response = self.client.post(
@@ -584,6 +586,21 @@ class DashboardTests(TestCase):
                 action="beta_invite.disabled",
             ).exists()
         )
+
+    def test_non_staff_owner_cannot_manage_beta_invites(self):
+        self.client.force_login(self.user)
+
+        list_response = self.client.get(reverse("beta_invites"))
+        create_response = self.client.post(
+            reverse("beta_invites"),
+            {"label": "Unauthorized owner", "max_uses": 1, "valid_for_days": 7},
+        )
+        dashboard_response = self.client.get(reverse("dashboard"))
+
+        self.assertEqual(list_response.status_code, 403)
+        self.assertEqual(create_response.status_code, 403)
+        self.assertNotContains(dashboard_response, "Beta invites")
+        self.assertFalse(BetaInvite.objects.filter(label="Unauthorized owner").exists())
 
     def test_manager_cannot_manage_beta_invites(self):
         manager = User.objects.create_user(username="invite-manager")
@@ -635,6 +652,8 @@ class DashboardTests(TestCase):
         self.assertNotContains(response, "private-request")
 
     def test_owner_cannot_toggle_another_workspace_invite(self):
+        self.user.is_staff = True
+        self.user.save(update_fields=["is_staff"])
         other_user = User.objects.create_user(username="invite-outsider")
         other_workspace = Workspace.objects.create(
             name="Invite Outside", slug="invite-outside", owner=other_user

@@ -271,6 +271,10 @@ def is_workspace_owner(request, membership):
     )
 
 
+def can_manage_beta_invites(request, membership):
+    return is_workspace_owner(request, membership) and request.user.is_staff
+
+
 @login_required
 def shops(request):
     context = workspace_context(request)
@@ -523,7 +527,7 @@ def delete_workspace(request):
 def beta_invites(request):
     context = workspace_context(request)
     membership = context["membership"]
-    if not is_workspace_owner(request, membership):
+    if not can_manage_beta_invites(request, membership):
         raise PermissionDenied
     form = BetaInviteForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -554,7 +558,7 @@ def toggle_invite(request, invite_id):
         return redirect("beta_invites")
     context = workspace_context(request)
     membership = context["membership"]
-    if not is_workspace_owner(request, membership):
+    if not can_manage_beta_invites(request, membership):
         raise PermissionDenied
     invite = get_object_or_404(BetaInvite, id=invite_id, workspace=membership.workspace)
     invite.is_active = not invite.is_active

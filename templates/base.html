@@ -23,7 +23,7 @@
             <a class="{% if request.resolver_match.url_name == 'shops' %}active{% endif %}" href="{% url 'shops' %}">Shops</a>
             <a class="{% if request.resolver_match.url_name == 'feedback' %}active{% endif %}" href="{% url 'feedback' %}?from={{ request.path|urlencode }}">Feedback</a>
             <a class="{% if request.resolver_match.url_name == 'privacy_data' or request.resolver_match.url_name == 'delete_workspace' %}active{% endif %}" href="{% url 'privacy_data' %}">Privacy &amp; data</a>
-            {% if membership.role == 'owner' %}<a class="{% if request.resolver_match.url_name == 'beta_invites' %}active{% endif %}" href="{% url 'beta_invites' %}">Beta invites</a>{% endif %}
+            {% if membership.role == 'owner' and request.user.is_staff %}<a class="{% if request.resolver_match.url_name == 'beta_invites' %}active{% endif %}" href="{% url 'beta_invites' %}">Beta invites</a>{% endif %}
             {% if membership.role == 'owner' %}<a class="{% if request.resolver_match.url_name == 'activity' %}active{% endif %}" href="{% url 'activity' %}">Activity</a>{% endif %}
             {% endif %}
             {% if request.user.is_superuser %}<a class="{% if request.resolver_match.url_name == 'system_status' %}active{% endif %}" href="{% url 'system_status' %}">System</a>{% endif %}

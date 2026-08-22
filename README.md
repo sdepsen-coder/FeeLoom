@@ -78,6 +78,11 @@ Etsy credentials, support contact, monitoring, and backup readiness. It reports
 configuration state only and never prints secret values. Remove `--no-fail` in a
 deployment pipeline when blockers should stop a release.
 
+Keep `FEELOOM_BACKUP_READY=false` until the production database has automated
+backups and a restore has been tested. Render Free Postgres expires after 30 days
+and provides no backups, so it is suitable only for disposable preview data. Set
+the value to `true` only after moving to a durable database and confirming recovery.
+
 For the beta email service, Brevo SMTP can be used without application code
 changes. Configure `smtp-relay.brevo.com` on port `2525`, the Brevo SMTP login,
 an SMTP key, and a verified sender address through the existing email environment

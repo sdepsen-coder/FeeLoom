@@ -175,6 +175,7 @@ if not ETSY_REDIRECT_URI and RENDER_EXTERNAL_HOSTNAME:
 FEELOOM_TOKEN_ENCRYPTION_KEY = os.environ.get("FEELOOM_TOKEN_ENCRYPTION_KEY", "")
 FEELOOM_LEGAL_VERSION = "2026-08-21"
 FEELOOM_SUPPORT_EMAIL = os.environ.get("FEELOOM_SUPPORT_EMAIL", "").strip()
+FEELOOM_BACKUP_READY = os.environ.get("FEELOOM_BACKUP_READY", "false").lower() == "true"
 
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "").strip()
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))

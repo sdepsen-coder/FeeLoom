@@ -779,6 +779,7 @@ class LaunchCheckCommandTests(TransactionTestCase):
         report = output.getvalue()
         self.assertIn("BLOCK Database engine", report)
         self.assertIn("BLOCK Debug mode", report)
+        self.assertIn("BLOCK Backups", report)
         self.assertIn("Summary:", report)
 
     @override_settings(
@@ -795,6 +796,7 @@ class LaunchCheckCommandTests(TransactionTestCase):
         ETSY_SHARED_SECRET="private-etsy-secret",
         ETSY_REDIRECT_URI="https://example.com/integrations/etsy/callback/",
         SENTRY_DSN="https://private-sentry-dsn@example.com/1",
+        FEELOOM_BACKUP_READY=True,
     )
     def test_check_never_prints_secret_values(self):
         output = StringIO()
@@ -807,6 +809,7 @@ class LaunchCheckCommandTests(TransactionTestCase):
         self.assertNotIn("private-etsy-secret", report)
         self.assertNotIn("private-sentry-dsn", report)
         self.assertIn("PASS  Etsy credentials", report)
+        self.assertIn("PASS  Backups", report)
 
 
 class SystemStatusTests(TestCase):

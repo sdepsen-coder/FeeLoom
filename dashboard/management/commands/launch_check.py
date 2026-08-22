@@ -199,13 +199,18 @@ class Command(BaseCommand):
                 "Sentry is configured" if settings.SENTRY_DSN else "Sentry is optional",
             )
         )
-        checks.append(
-            LaunchCheck(
-                "WARN",
-                "Backups",
-                "Confirm an external schedule and a tested restore before real data",
+        if settings.FEELOOM_BACKUP_READY:
+            checks.append(
+                LaunchCheck("PASS", "Backups", "Backup and restore plan confirmed")
             )
-        )
+        else:
+            checks.append(
+                LaunchCheck(
+                    "BLOCK" if production else "WARN",
+                    "Backups",
+                    "Confirm backups and a tested restore before storing real seller data",
+                )
+            )
         return checks
 
 

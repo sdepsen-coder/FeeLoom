@@ -37,6 +37,8 @@ services:
         sync: false
       - key: FEELOOM_SUPPORT_EMAIL
         sync: false
+      - key: FEELOOM_BACKUP_READY
+        value: false
       - key: FEELOOM_BOOTSTRAP_ADMIN_ON_START
         sync: false
       - key: FEELOOM_BOOTSTRAP_ADMIN_USERNAME

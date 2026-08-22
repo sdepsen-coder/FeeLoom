@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}System status | FeeLoom{% endblock %}
+{% block content %}
+  <header class="page-heading"><div><p class="eyebrow">OPERATIONS</p><h1>Beta readiness</h1></div></header>
+  <div class="split-layout">
+    <section>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Status</th><th>Check</th><th>Detail</th></tr></thead>
+          <tbody>
+            {% for check in readiness_checks %}
+              <tr>
+                <td><span class="status {% if check.status == 'PASS' %}status-profitable{% elif check.status == 'BLOCK' %}status-loss{% else %}status-low_margin{% endif %}">{{ check.status }}</span></td>
+                <td><strong>{{ check.label }}</strong></td>
+                <td>{{ check.detail }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <aside class="form-panel">
+      <h2>Test account email</h2>
+      {% if email_delivery_enabled %}
+        <form method="post" class="stack-form">
+          {% csrf_token %}
+          {{ email_test_form.as_p }}
+          <button class="primary-button" type="submit">Send test email</button>
+        </form>
+      {% else %}
+        <p class="form-note">Add the production SMTP settings in Render before sending a test.</p>
+      {% endif %}
+    </aside>
+  </div>
+{% endblock %}

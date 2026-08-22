@@ -78,6 +78,12 @@ Etsy credentials, support contact, monitoring, and backup readiness. It reports
 configuration state only and never prints secret values. Remove `--no-fail` in a
 deployment pipeline when blockers should stop a release.
 
+For the beta email service, Brevo SMTP can be used without application code
+changes. Configure `smtp-relay.brevo.com` on port `587`, the Brevo SMTP login,
+an SMTP key, and a verified sender address through the existing email environment
+variables. A superuser can then open `/system-status/` and send a delivery test;
+secret values are never displayed by the page.
+
 ## Render preview
 
 The Blueprint provisions a free web service and free PostgreSQL database. Render

@@ -1,5 +1,6 @@
 import csv
 import json
+import logging
 from decimal import Decimal
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.core.mail import send_mail
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.paginator import Paginator
 from django.db.models import Q, Sum
@@ -25,9 +27,13 @@ from sales.models import FeeLine, ImportBatch, Order, OrderItem, ProductCost
 from workspaces.models import Membership, Shop
 from workspaces.selectors import ACTIVE_SHOP_SESSION_KEY, ALL_SHOPS_VALUE, shop_selection
 
-from .forms import DeleteWorkspaceForm, EtsyCSVImportForm, FeedbackForm, ProductCostForm, ShopForm
+from .forms import DeleteWorkspaceForm, EtsyCSVImportForm, FeedbackForm, ProductCostForm, ShopForm, SystemEmailTestForm
+from .management.commands.launch_check import production_checks, production_email_ready
 from .models import AuditEvent, Feedback
 from .audit import record_audit
+
+
+logger = logging.getLogger(__name__)
 
 
 def money(value):
@@ -560,6 +566,49 @@ def activity(request):
     )
     context["activity_page"] = Paginator(events, 25).get_page(request.GET.get("page"))
     return render(request, "dashboard/activity.html", context)
+
+
+@login_required
+def system_status(request):
+    if not request.user.is_superuser:
+        raise PermissionDenied
+    context = workspace_context(request)
+    form = SystemEmailTestForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        if not production_email_ready():
+            messages.error(request, "Production email delivery is not configured yet.")
+        else:
+            try:
+                send_mail(
+                    "FeeLoom email delivery test",
+                    "FeeLoom account email delivery is configured and working.",
+                    settings.DEFAULT_FROM_EMAIL,
+                    [form.cleaned_data["recipient"]],
+                    fail_silently=False,
+                )
+                if context["membership"]:
+                    record_audit(
+                        request,
+                        workspace=context["membership"].workspace,
+                        action="system.email_test_succeeded",
+                        summary="Production email delivery tested",
+                    )
+                messages.success(request, "Test email sent successfully.")
+            except Exception:
+                logger.exception("production_email_test_failed")
+                messages.error(
+                    request,
+                    "The test email could not be sent. Check the provider and Render logs.",
+                )
+        return redirect("system_status")
+    context.update(
+        {
+            "readiness_checks": production_checks(),
+            "email_test_form": form,
+            "email_delivery_enabled": production_email_ready(),
+        }
+    )
+    return render(request, "dashboard/system_status.html", context)
 
 
 @login_required

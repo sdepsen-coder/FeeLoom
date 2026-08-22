@@ -98,3 +98,10 @@ class DeleteWorkspaceForm(forms.Form):
         if not self.user.check_password(password):
             raise forms.ValidationError("Your password is incorrect.")
         return password
+
+
+class SystemEmailTestForm(forms.Form):
+    recipient = forms.EmailField(
+        label="Test recipient",
+        help_text="FeeLoom sends one account email to this address.",
+    )

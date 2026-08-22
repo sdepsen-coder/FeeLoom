@@ -8,7 +8,9 @@ from types import SimpleNamespace
 from unittest import skipUnless
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth.models import User
+from django.core import mail
 from django.core.management.base import CommandError
 from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -634,3 +636,69 @@ class LaunchCheckCommandTests(TransactionTestCase):
         self.assertNotIn("private-etsy-secret", report)
         self.assertNotIn("private-sentry-dsn", report)
         self.assertIn("PASS  Etsy credentials", report)
+
+
+class SystemStatusTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            username="system-admin",
+            email="admin@example.com",
+            password="admin-pass-123",
+        )
+        self.workspace = Workspace.objects.create(
+            name="System Studio",
+            slug="system-studio",
+            owner=self.admin,
+        )
+        Membership.objects.create(
+            workspace=self.workspace,
+            user=self.admin,
+            role=Membership.Role.OWNER,
+        )
+        Shop.objects.create(workspace=self.workspace, name="System Shop")
+
+    def test_system_status_is_superuser_only(self):
+        regular = User.objects.create_user(username="regular", password="regular-pass")
+        Membership.objects.create(
+            workspace=self.workspace,
+            user=regular,
+            role=Membership.Role.MANAGER,
+        )
+        self.client.force_login(regular)
+
+        response = self.client.get(reverse("system_status"))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_superuser_can_view_readiness_without_secret_values(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("system_status"))
+
+        self.assertContains(response, "Beta readiness")
+        self.assertContains(response, "Database")
+        self.assertNotContains(response, settings.SECRET_KEY)
+
+    @override_settings(
+        EMAIL_DELIVERY_ENABLED=True,
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        DEFAULT_FROM_EMAIL="FeeLoom <account@example.com>",
+        CONFIGURED_FROM_EMAIL="FeeLoom <account@example.com>",
+        EMAIL_HOST="smtp.example.com",
+        EMAIL_HOST_USER="smtp-user",
+        EMAIL_HOST_PASSWORD="smtp-password",
+    )
+    def test_superuser_can_send_account_email_test(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("system_status"),
+            {"recipient": "owner@example.com"},
+        )
+
+        self.assertRedirects(response, reverse("system_status"))
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["owner@example.com"])
+        self.assertTrue(
+            AuditEvent.objects.filter(action="system.email_test_succeeded").exists()
+        )

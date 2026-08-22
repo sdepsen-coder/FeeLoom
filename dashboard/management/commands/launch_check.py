@@ -150,13 +150,9 @@ class Command(BaseCommand):
                 LaunchCheck("WARN", "Support email", "Add a public support address")
             )
 
-        production_email_ready = bool(
-            settings.EMAIL_HOST
-            and settings.EMAIL_HOST_USER
-            and settings.EMAIL_HOST_PASSWORD
-            and settings.CONFIGURED_FROM_EMAIL
+        email_ready = (
+            production_email_ready() if production else settings.EMAIL_DELIVERY_ENABLED
         )
-        email_ready = production_email_ready if production else settings.EMAIL_DELIVERY_ENABLED
         if email_ready:
             checks.append(
                 LaunchCheck("PASS", "Account email", "Password reset is enabled")
@@ -211,3 +207,16 @@ class Command(BaseCommand):
             )
         )
         return checks
+
+
+def production_checks():
+    return Command()._checks(production=True)
+
+
+def production_email_ready():
+    return bool(
+        settings.EMAIL_HOST
+        and settings.EMAIL_HOST_USER
+        and settings.EMAIL_HOST_PASSWORD
+        and settings.CONFIGURED_FROM_EMAIL
+    )

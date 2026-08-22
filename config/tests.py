@@ -1,5 +1,5 @@
 from django.contrib.auth.models import User
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import Client, RequestFactory, TestCase, override_settings
 
 from .views import server_error
 
@@ -23,6 +23,16 @@ class ErrorPageTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertContains(response, "Access denied", status_code=403)
         self.assertContains(response, "Back to overview", status_code=403)
+
+    def test_csrf_failure_uses_safe_reload_page(self):
+        csrf_client = Client(enforce_csrf_checks=True)
+
+        response = csrf_client.post("/accounts/signup/", {})
+
+        self.assertEqual(response.status_code, 403)
+        self.assertContains(response, "Form expired", status_code=403)
+        self.assertContains(response, "Reload form", status_code=403)
+        self.assertNotContains(response, "CSRF verification failed", status_code=403)
 
     def test_server_error_does_not_require_application_context(self):
         request = RequestFactory().get("/broken/")

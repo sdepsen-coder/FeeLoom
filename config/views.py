@@ -51,6 +51,17 @@ def permission_denied(request, exception=None):
     )
 
 
+def csrf_failure(request, reason=""):
+    context = error_context(
+        request,
+        code="403",
+        title="Form expired",
+        message="This form is no longer current. Reload it and try again.",
+    )
+    context.update({"action_url": request.path, "action_label": "Reload form"})
+    return render(request, "errors/error.html", context, status=403)
+
+
 def page_not_found(request, exception=None):
     return render(
         request,

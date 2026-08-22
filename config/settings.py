@@ -150,6 +150,8 @@ CSRF_TRUSTED_ORIGINS = [
     for origin in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")
     if origin.strip()
 ]
+
+CSRF_FAILURE_VIEW = "config.views.csrf_failure"
 if RENDER_EXTERNAL_HOSTNAME:
     render_origin = f"https://{RENDER_EXTERNAL_HOSTNAME}"
     if render_origin not in CSRF_TRUSTED_ORIGINS:

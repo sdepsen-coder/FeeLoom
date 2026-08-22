@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Feedback inbox | FeeLoom{% endblock %}
+{% block content %}
+  <header class="page-heading">
+    <div><p class="eyebrow">OPERATIONS</p><h1>Feedback inbox</h1></div>
+  </header>
+  <form method="get" class="filter-bar">
+    <label for="feedback-status">Status</label>
+    <select id="feedback-status" name="status" onchange="this.form.submit()">
+      <option value="">All statuses</option>
+      {% for value, label in feedback_statuses %}<option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </form>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Submitted</th><th>Seller</th><th>Category</th><th>Rating</th><th>Message</th><th>Page</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for item in feedback_page %}
+          <tr>
+            <td>{{ item.created_at|date:"M j, Y H:i" }}</td>
+            <td><strong>{{ item.workspace.name }}</strong><br><span class="form-note">{{ item.shop.name|default:"No shop" }} · {{ item.user.username }}</span></td>
+            <td>{{ item.get_category_display }}</td>
+            <td><strong>{{ item.rating }}/5</strong></td>
+            <td class="feedback-message">{{ item.message }}</td>
+            <td>{{ item.page_path|default:"-" }}</td>
+            <td>
+              <form method="post" action="{% url 'update_feedback_status' item.id %}" class="inline-status-form">
+                {% csrf_token %}
+                <input type="hidden" name="status_filter" value="{{ status_filter }}">
+                <select name="status" aria-label="Status for feedback {{ item.id }}">
+                  {% for value, label in feedback_statuses %}<option value="{{ value }}" {% if item.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                </select>
+                <button class="secondary-button compact" type="submit">Save</button>
+              </form>
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="7" class="empty-state">No feedback matches this status.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if feedback_page.has_other_pages %}
+    <div class="pagination">
+      {% if feedback_page.has_previous %}<a href="?status={{ status_filter }}&amp;page={{ feedback_page.previous_page_number }}">Previous</a>{% endif %}
+      <span>Page {{ feedback_page.number }} of {{ feedback_page.paginator.num_pages }}</span>
+      {% if feedback_page.has_next %}<a href="?status={{ status_filter }}&amp;page={{ feedback_page.next_page_number }}">Next</a>{% endif %}
+    </div>
+  {% endif %}
+{% endblock %}

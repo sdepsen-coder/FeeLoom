@@ -826,7 +826,7 @@ class SystemStatusTests(TestCase):
             user=self.admin,
             role=Membership.Role.OWNER,
         )
-        Shop.objects.create(workspace=self.workspace, name="System Shop")
+        self.shop = Shop.objects.create(workspace=self.workspace, name="System Shop")
 
     def test_system_status_is_superuser_only(self):
         regular = User.objects.create_user(username="regular", password="regular-pass")
@@ -849,6 +849,41 @@ class SystemStatusTests(TestCase):
         self.assertContains(response, "Beta readiness")
         self.assertContains(response, "Database")
         self.assertNotContains(response, settings.SECRET_KEY)
+
+    def test_feedback_inbox_is_superuser_only(self):
+        staff_user = User.objects.create_user(
+            username="support-staff", password="staff-pass", is_staff=True
+        )
+        self.client.force_login(staff_user)
+
+        response = self.client.get(reverse("feedback_inbox"))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_superuser_can_review_feedback(self):
+        submission = Feedback.objects.create(
+            workspace=self.workspace,
+            shop=self.shop,
+            user=self.admin,
+            category=Feedback.Category.USABILITY,
+            rating=3,
+            message="The import step needs a clearer label.",
+            page_path="/sales/import/",
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("feedback_inbox"))
+
+        self.assertContains(response, "The import step needs a clearer label.")
+        self.assertContains(response, "System Studio")
+
+        update_response = self.client.post(
+            reverse("update_feedback_status", args=[submission.id]),
+            {"status": Feedback.Status.REVIEWING},
+        )
+        submission.refresh_from_db()
+        self.assertRedirects(update_response, reverse("feedback_inbox"))
+        self.assertEqual(submission.status, Feedback.Status.REVIEWING)
 
     @override_settings(
         EMAIL_DELIVERY_ENABLED=True,

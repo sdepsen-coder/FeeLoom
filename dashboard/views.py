@@ -650,6 +650,49 @@ def system_status(request):
 
 
 @login_required
+def feedback_inbox(request):
+    if not request.user.is_superuser:
+        raise PermissionDenied
+    context = workspace_context(request)
+    status_filter = request.GET.get("status", "")
+    valid_statuses = {value for value, _label in Feedback.Status.choices}
+    feedback_items = Feedback.objects.select_related("workspace", "shop", "user")
+    if status_filter in valid_statuses:
+        feedback_items = feedback_items.filter(status=status_filter)
+    else:
+        status_filter = ""
+    context.update(
+        {
+            "feedback_page": Paginator(feedback_items, 25).get_page(request.GET.get("page")),
+            "feedback_statuses": Feedback.Status.choices,
+            "status_filter": status_filter,
+        }
+    )
+    return render(request, "dashboard/feedback_inbox.html", context)
+
+
+@login_required
+def update_feedback_status(request, feedback_id):
+    if not request.user.is_superuser:
+        raise PermissionDenied
+    if request.method != "POST":
+        return redirect("feedback_inbox")
+    submission = get_object_or_404(Feedback, id=feedback_id)
+    new_status = request.POST.get("status", "")
+    valid_statuses = {value for value, _label in Feedback.Status.choices}
+    if new_status in valid_statuses:
+        submission.status = new_status
+        submission.save(update_fields=["status"])
+        messages.success(request, "Feedback status updated.")
+    else:
+        messages.error(request, "Choose a valid feedback status.")
+    status_filter = request.POST.get("status_filter", "")
+    if status_filter in valid_statuses:
+        return redirect(f"{reverse('feedback_inbox')}?status={status_filter}")
+    return redirect("feedback_inbox")
+
+
+@login_required
 def getting_started(request):
     context = workspace_context(request)
     if not context["membership"]:

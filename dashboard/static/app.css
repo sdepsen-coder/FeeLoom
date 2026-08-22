@@ -30,6 +30,9 @@ h1,h2,p { margin-top:0; } h1 { margin-bottom:0; font-size:30px; line-height:1.2;
 .metric span { color:var(--muted); font-weight:650; } .metric strong { font-size:24px; } .metric.emphasis { border-color:#a6cfc0; background:var(--green-soft); }
 .table-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:6px; background:var(--panel); }
 table { width:100%; border-collapse:collapse; white-space:nowrap; }
+.feedback-message { min-width:260px; max-width:460px; white-space:normal; }
+.inline-status-form { display:flex; align-items:center; gap:8px; }
+.inline-status-form select { width:auto; min-width:118px; }
 th,td { padding:13px 14px; border-bottom:1px solid var(--line); text-align:left; }
 th { color:var(--muted); background:#fafbfa; font-size:12px; font-weight:750; } tbody tr:last-child td { border-bottom:0; } tbody tr:hover { background:#fbfcfb; }
 .numeric { text-align:right; font-variant-numeric:tabular-nums; } .order-link { color:var(--ink); font-weight:750; } .empty-state { height:130px; color:var(--muted); text-align:center; }

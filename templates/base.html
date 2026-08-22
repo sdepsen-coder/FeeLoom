@@ -26,7 +26,10 @@
             {% if membership.role == 'owner' and request.user.is_staff %}<a class="{% if request.resolver_match.url_name == 'beta_invites' %}active{% endif %}" href="{% url 'beta_invites' %}">Beta invites</a>{% endif %}
             {% if membership.role == 'owner' %}<a class="{% if request.resolver_match.url_name == 'activity' %}active{% endif %}" href="{% url 'activity' %}">Activity</a>{% endif %}
             {% endif %}
-            {% if request.user.is_superuser %}<a class="{% if request.resolver_match.url_name == 'system_status' %}active{% endif %}" href="{% url 'system_status' %}">System</a>{% endif %}
+            {% if request.user.is_superuser %}
+            <a class="{% if request.resolver_match.url_name == 'feedback_inbox' or request.resolver_match.url_name == 'update_feedback_status' %}active{% endif %}" href="{% url 'feedback_inbox' %}">Feedback inbox</a>
+            <a class="{% if request.resolver_match.url_name == 'system_status' %}active{% endif %}" href="{% url 'system_status' %}">System</a>
+            {% endif %}
             <div class="mobile-account"><span>{{ request.user.username }}</span><form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="text-button" type="submit">Sign out</button></form></div>
           </nav>
           <div class="sidebar-footer"><span>{{ request.user.username }}</span><form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="text-button" type="submit">Sign out</button></form></div>

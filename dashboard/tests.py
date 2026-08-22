@@ -2,6 +2,7 @@ import sqlite3
 import tempfile
 from datetime import timedelta
 from decimal import Decimal
+from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import skipUnless
@@ -12,7 +13,7 @@ from django.core.management.base import CommandError
 from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
-from django.test import SimpleTestCase, TestCase, TransactionTestCase
+from django.test import SimpleTestCase, TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -593,3 +594,43 @@ class PostgreSQLBackupCommandTests(SimpleTestCase):
         self.assertNotIn("private-password", command)
         self.assertEqual(environment["PGPASSWORD"], "private-password")
         self.assertEqual(environment["PGSSLMODE"], "require")
+
+
+class LaunchCheckCommandTests(TransactionTestCase):
+    @override_settings(DEBUG=True)
+    def test_production_check_reports_local_blockers(self):
+        output = StringIO()
+
+        call_command("launch_check", production=True, no_fail=True, stdout=output)
+
+        report = output.getvalue()
+        self.assertIn("BLOCK Database engine", report)
+        self.assertIn("BLOCK Debug mode", report)
+        self.assertIn("Summary:", report)
+
+    @override_settings(
+        DEBUG=False,
+        SECRET_KEY="a-strong-production-secret-with-many-unique-characters-1234567890",
+        FEELOOM_TOKEN_ENCRYPTION_KEY="private-encryption-key-value",
+        FEELOOM_SUPPORT_EMAIL="support@example.com",
+        EMAIL_DELIVERY_ENABLED=True,
+        EMAIL_HOST="smtp.example.com",
+        EMAIL_HOST_USER="smtp-user",
+        EMAIL_HOST_PASSWORD="private-smtp-password",
+        CONFIGURED_FROM_EMAIL="support@example.com",
+        ETSY_API_KEY="private-etsy-key",
+        ETSY_SHARED_SECRET="private-etsy-secret",
+        ETSY_REDIRECT_URI="https://example.com/integrations/etsy/callback/",
+        SENTRY_DSN="https://private-sentry-dsn@example.com/1",
+    )
+    def test_check_never_prints_secret_values(self):
+        output = StringIO()
+
+        call_command("launch_check", production=True, no_fail=True, stdout=output)
+
+        report = output.getvalue()
+        self.assertNotIn("private-encryption-key-value", report)
+        self.assertNotIn("private-etsy-key", report)
+        self.assertNotIn("private-etsy-secret", report)
+        self.assertNotIn("private-sentry-dsn", report)
+        self.assertIn("PASS  Etsy credentials", report)

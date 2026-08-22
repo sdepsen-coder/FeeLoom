@@ -65,6 +65,19 @@ separate password manager. A database backup without the original token encrypti
 key cannot restore Etsy connections. Test PostgreSQL restores with `pg_restore`
 before relying on a backup, and never commit backup files or secrets to Git.
 
+## Beta launch check
+
+Run the production readiness report before inviting sellers:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py launch_check --production --no-fail
+```
+
+The report checks the database, migrations, production security, email delivery,
+Etsy credentials, support contact, monitoring, and backup readiness. It reports
+configuration state only and never prints secret values. Remove `--no-fail` in a
+deployment pipeline when blockers should stop a release.
+
 ## Render preview
 
 The Blueprint provisions a free web service and free PostgreSQL database. Render

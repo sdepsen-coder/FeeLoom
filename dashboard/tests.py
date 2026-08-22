@@ -99,6 +99,16 @@ class DashboardTests(TestCase):
         self.assertContains(sales_response, "ORDER-100")
         self.assertContains(sales_response, "Ceramic Mug")
 
+    def test_authenticated_layout_has_accessible_mobile_navigation(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("dashboard"))
+
+        self.assertContains(response, 'aria-controls="workspace-nav"')
+        self.assertContains(response, 'aria-expanded="false"')
+        self.assertContains(response, 'id="workspace-nav"')
+        self.assertContains(response, "Sign out", count=2)
+
     def test_other_workspace_order_is_hidden(self):
         other_user = User.objects.create_user(username="other")
         other_workspace = Workspace.objects.create(

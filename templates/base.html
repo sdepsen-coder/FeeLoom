@@ -5,14 +5,15 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}FeeLoom{% endblock %}</title>
-    <link rel="stylesheet" href="{% static 'app.css' %}">
+    <link rel="stylesheet" href="{% static 'app.css' %}?v=20260822">
   </head>
   <body>
     <div class="app-shell">
       <aside class="sidebar">
         <a class="brand" href="{% url 'dashboard' %}"><span class="brand-mark">F</span><span>FeeLoom</span></a>
         {% if request.user.is_authenticated %}
-          <nav class="side-nav" aria-label="Workspace">
+          <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="workspace-nav" aria-label="Open navigation"><span aria-hidden="true">&#9776;</span></button>
+          <nav class="side-nav" id="workspace-nav" aria-label="Workspace">
             {% if membership %}
             <a class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">Overview</a>
             <a class="{% if request.resolver_match.url_name == 'getting_started' %}active{% endif %}" href="{% url 'getting_started' %}">Getting started</a>
@@ -26,6 +27,7 @@
             {% if membership.role == 'owner' %}<a class="{% if request.resolver_match.url_name == 'activity' %}active{% endif %}" href="{% url 'activity' %}">Activity</a>{% endif %}
             {% endif %}
             {% if request.user.is_superuser %}<a class="{% if request.resolver_match.url_name == 'system_status' %}active{% endif %}" href="{% url 'system_status' %}">System</a>{% endif %}
+            <div class="mobile-account"><span>{{ request.user.username }}</span><form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="text-button" type="submit">Sign out</button></form></div>
           </nav>
           <div class="sidebar-footer"><span>{{ request.user.username }}</span><form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="text-button" type="submit">Sign out</button></form></div>
         {% endif %}
@@ -51,5 +53,16 @@
         <footer class="site-footer"><span>FeeLoom beta</span><a href="{% url 'privacy_policy' %}">Privacy</a><a href="{% url 'terms_of_service' %}">Terms</a></footer>
       </div>
     </div>
+    <script>
+      (function(){
+        var toggle=document.querySelector(".nav-toggle");
+        var nav=document.getElementById("workspace-nav");
+        if(!toggle||!nav){return;}
+        function closeNav(){nav.classList.remove("is-open");toggle.setAttribute("aria-expanded","false");toggle.setAttribute("aria-label","Open navigation");}
+        toggle.addEventListener("click",function(){var open=!nav.classList.contains("is-open");nav.classList.toggle("is-open",open);toggle.setAttribute("aria-expanded",String(open));toggle.setAttribute("aria-label",open?"Close navigation":"Open navigation");});
+        nav.querySelectorAll("a").forEach(function(link){link.addEventListener("click",closeNav);});
+        document.addEventListener("keydown",function(event){if(event.key==="Escape"){closeNav();}});
+      })();
+    </script>
   </body>
 </html>

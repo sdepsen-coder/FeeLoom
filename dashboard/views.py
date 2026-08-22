@@ -12,7 +12,7 @@ from django.core.exceptions import PermissionDenied
 from django.core.mail import send_mail
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.paginator import Paginator
-from django.db.models import Q, Sum
+from django.db.models import Count, Q, Sum
 from django.http import FileResponse, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -24,7 +24,7 @@ from accounts.models import BetaInvite, LegalAcceptance
 from integrations.models import EtsyConnection, EtsySyncRun
 from sales.importers import CSVImportError, import_etsy_orders
 from sales.models import FeeLine, ImportBatch, Order, OrderItem, ProductCost
-from workspaces.models import Membership, Shop
+from workspaces.models import Membership, Shop, Workspace
 from workspaces.selectors import ACTIVE_SHOP_SESSION_KEY, ALL_SHOPS_VALUE, shop_selection
 
 from .forms import DeleteWorkspaceForm, EtsyCSVImportForm, FeedbackForm, ProductCostForm, ShopForm, SystemEmailTestForm
@@ -669,6 +669,41 @@ def feedback_inbox(request):
         }
     )
     return render(request, "dashboard/feedback_inbox.html", context)
+
+
+@login_required
+def beta_accounts(request):
+    if not request.user.is_superuser:
+        raise PermissionDenied
+    context = workspace_context(request)
+    query = request.GET.get("q", "").strip()
+    verification = request.GET.get("verification", "")
+    workspaces = Workspace.objects.select_related("owner").annotate(
+        shop_count=Count("shops", distinct=True),
+        order_count=Count("shops__orders", distinct=True),
+        cost_count=Count("shops__product_costs", distinct=True),
+        feedback_count=Count("feedback", distinct=True),
+    ).order_by("-created_at", "-id")
+    if query:
+        workspaces = workspaces.filter(
+            Q(name__icontains=query)
+            | Q(owner__username__icontains=query)
+            | Q(owner__email__icontains=query)
+        )
+    if verification == "verified":
+        workspaces = workspaces.filter(owner__is_active=True)
+    elif verification == "unverified":
+        workspaces = workspaces.filter(owner__is_active=False)
+    else:
+        verification = ""
+    context.update(
+        {
+            "accounts_page": Paginator(workspaces, 25).get_page(request.GET.get("page")),
+            "account_query": query,
+            "verification_filter": verification,
+        }
+    )
+    return render(request, "dashboard/beta_accounts.html", context)
 
 
 @login_required

@@ -27,6 +27,7 @@
             {% if membership.role == 'owner' %}<a class="{% if request.resolver_match.url_name == 'activity' %}active{% endif %}" href="{% url 'activity' %}">Activity</a>{% endif %}
             {% endif %}
             {% if request.user.is_superuser %}
+            <a class="{% if request.resolver_match.url_name == 'beta_accounts' %}active{% endif %}" href="{% url 'beta_accounts' %}">Beta accounts</a>
             <a class="{% if request.resolver_match.url_name == 'feedback_inbox' or request.resolver_match.url_name == 'update_feedback_status' %}active{% endif %}" href="{% url 'feedback_inbox' %}">Feedback inbox</a>
             <a class="{% if request.resolver_match.url_name == 'system_status' %}active{% endif %}" href="{% url 'system_status' %}">System</a>
             {% endif %}

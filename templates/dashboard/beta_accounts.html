@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Beta accounts | FeeLoom{% endblock %}
+{% block content %}
+  <header class="page-heading">
+    <div><p class="eyebrow">OPERATIONS</p><h1>Beta accounts</h1></div>
+  </header>
+  <form method="get" class="filter-bar">
+    <input type="search" name="q" value="{{ account_query }}" placeholder="Search workspace, username, or email" aria-label="Search beta accounts">
+    <select name="verification" aria-label="Email verification" onchange="this.form.submit()">
+      <option value="">All accounts</option>
+      <option value="verified" {% if verification_filter == 'verified' %}selected{% endif %}>Verified</option>
+      <option value="unverified" {% if verification_filter == 'unverified' %}selected{% endif %}>Awaiting verification</option>
+    </select>
+    <button class="secondary-button compact" type="submit">Search</button>
+    {% if account_query or verification_filter %}<a class="clear-link" href="{% url 'beta_accounts' %}">Clear</a>{% endif %}
+  </form>
+  <div class="table-wrap order-table-wrap">
+    <table class="order-table">
+      <thead><tr><th>Workspace</th><th>Account</th><th>Verification</th><th>Shops</th><th>Costs</th><th>Sales</th><th>Feedback</th><th>Last sign in</th></tr></thead>
+      <tbody>
+        {% for workspace in accounts_page %}
+          <tr>
+            <td data-label="Workspace" class="shop-cell"><strong>{{ workspace.name }}</strong><br><small>Joined {{ workspace.created_at|date:"M j, Y" }}</small></td>
+            <td data-label="Account" class="product-cell"><strong>{{ workspace.owner.username }}</strong><br><small>{{ workspace.owner.email }}</small></td>
+            <td data-label="Verification"><span class="status {% if workspace.owner.is_active %}status-profitable{% else %}status-low_margin{% endif %}">{% if workspace.owner.is_active %}Verified{% else %}Waiting{% endif %}</span></td>
+            <td data-label="Shops" class="numeric">{{ workspace.shop_count }}</td>
+            <td data-label="Costs" class="numeric">{{ workspace.cost_count }}</td>
+            <td data-label="Sales" class="numeric">{{ workspace.order_count }}</td>
+            <td data-label="Feedback" class="numeric">{{ workspace.feedback_count }}</td>
+            <td data-label="Last sign in">{{ workspace.owner.last_login|date:"M j, Y H:i"|default:"Never" }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="8" class="empty-state">No beta accounts match these filters.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if accounts_page.has_other_pages %}
+    <div class="pagination">
+      {% if accounts_page.has_previous %}<a href="?q={{ account_query|urlencode }}&amp;verification={{ verification_filter }}&amp;page={{ accounts_page.previous_page_number }}">Previous</a>{% endif %}
+      <span>Page {{ accounts_page.number }} of {{ accounts_page.paginator.num_pages }}</span>
+      {% if accounts_page.has_next %}<a href="?q={{ account_query|urlencode }}&amp;verification={{ verification_filter }}&amp;page={{ accounts_page.next_page_number }}">Next</a>{% endif %}
+    </div>
+  {% endif %}
+{% endblock %}

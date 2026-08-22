@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import activity, beta_invites, dashboard, delete_workspace, download_sample_csv, export_sales, export_workspace_data, feedback, feedback_inbox, getting_started, import_sales, privacy_data, product_costs, sale_detail, sales_table, shops, switch_shop, system_status, toggle_invite, toggle_shop, update_feedback_status
+from .views import activity, beta_accounts, beta_invites, dashboard, delete_workspace, download_sample_csv, export_sales, export_workspace_data, feedback, feedback_inbox, getting_started, import_sales, privacy_data, product_costs, sale_detail, sales_table, shops, switch_shop, system_status, toggle_invite, toggle_shop, update_feedback_status
 
 
 urlpatterns = [
@@ -21,6 +21,7 @@ urlpatterns = [
     path("beta-invites/<int:invite_id>/toggle/", toggle_invite, name="toggle_invite"),
     path("activity/", activity, name="activity"),
     path("system-status/", system_status, name="system_status"),
+    path("system-accounts/", beta_accounts, name="beta_accounts"),
     path("system-feedback/", feedback_inbox, name="feedback_inbox"),
     path("system-feedback/<int:feedback_id>/status/", update_feedback_status, name="update_feedback_status"),
     path("getting-started/", getting_started, name="getting_started"),

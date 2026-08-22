@@ -863,6 +863,38 @@ class SystemStatusTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
 
+    def test_beta_accounts_is_superuser_only(self):
+        staff_user = User.objects.create_user(
+            username="account-staff", password="staff-pass", is_staff=True
+        )
+        self.client.force_login(staff_user)
+
+        response = self.client.get(reverse("beta_accounts"))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_superuser_can_filter_beta_accounts(self):
+        awaiting_owner = User.objects.create_user(
+            username="awaiting-owner",
+            email="awaiting@example.com",
+            is_active=False,
+        )
+        awaiting_workspace = Workspace.objects.create(
+            name="Awaiting Studio",
+            slug="awaiting-studio",
+            owner=awaiting_owner,
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse("beta_accounts"),
+            {"q": "awaiting@example.com", "verification": "unverified"},
+        )
+
+        self.assertContains(response, "Awaiting Studio")
+        self.assertContains(response, "Waiting")
+        self.assertEqual(list(response.context["accounts_page"]), [awaiting_workspace])
+
     def test_superuser_can_review_feedback(self):
         submission = Feedback.objects.create(
             workspace=self.workspace,

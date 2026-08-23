@@ -613,7 +613,11 @@ def system_status(request):
         raise PermissionDenied
     context = workspace_context(request)
     action = request.POST.get("action", "email_test")
-    form = SystemEmailTestForm(request.POST if action == "email_test" else None)
+    form = SystemEmailTestForm(
+        request.POST
+        if request.method == "POST" and action == "email_test"
+        else None
+    )
     if request.method == "POST" and action == "sentry_test":
         if not settings.SENTRY_DSN:
             messages.error(request, "Sentry error monitoring is not configured yet.")

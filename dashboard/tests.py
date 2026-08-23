@@ -851,6 +851,7 @@ class SystemStatusTests(TestCase):
 
         self.assertContains(response, "Beta readiness")
         self.assertContains(response, "Database")
+        self.assertNotContains(response, "This field is required.")
         self.assertNotContains(response, settings.SECRET_KEY)
 
     def test_feedback_inbox_is_superuser_only(self):

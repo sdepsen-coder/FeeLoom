@@ -118,7 +118,11 @@ def signup(request):
             return rate_limited_response(request, settings.SIGNUP_RATE_WINDOW)
         record_hit("signup-ip", ip, settings.SIGNUP_RATE_WINDOW)
 
-    form = SignupForm(request.POST or None)
+    invite_code = request.GET.get("invite", "").strip().upper()[:20]
+    form = SignupForm(
+        request.POST or None,
+        initial={"invite_code": invite_code} if request.method == "GET" and invite_code else None,
+    )
     if request.method == "POST" and form.is_valid():
         with transaction.atomic():
             invite = BetaInvite.objects.select_for_update().filter(

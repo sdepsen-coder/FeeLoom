@@ -1,16 +1,23 @@
 {% extends "base.html" %}
 {% block title %}Shops | FeeLoom{% endblock %}
 {% block content %}
-  <header class="page-heading"><div><p class="eyebrow">WORKSPACE</p><h1>Shops</h1></div></header>
-  <div class="split-layout">
+  <header class="page-heading"><div><p class="eyebrow">WORKSPACE</p><h1>Shops</h1><p class="heading-note">Manage every Etsy business without mixing its sales or costs.</p></div></header>
+  <section class="shop-summary" aria-label="Shop summary">
+    <div><span>Total shops</span><strong>{{ shop_count }}</strong></div>
+    <div><span>Active</span><strong>{{ active_shop_count }}</strong></div>
+    <div><span>Etsy connected</span><strong>{{ connected_shop_count }}</strong></div>
+    <div><span>Orders tracked</span><strong>{{ shop_order_count }}</strong></div>
+  </section>
+  <div class="split-layout shops-layout">
     <section>
       <div class="section-heading"><div><h2>Connected businesses</h2><p>Each shop keeps its own sales and product costs.</p></div></div>
       <div class="shop-list">
         {% for workspace_shop in workspace_shops %}
-          <article class="shop-row">
-            <div><strong>{{ workspace_shop.name }}</strong><span>{{ workspace_shop.get_marketplace_display }} · {{ workspace_shop.currency }}</span>{% if workspace_shop.etsy_connection %}<small>Connected{% if workspace_shop.etsy_connection.last_synced_at %} · Synced {{ workspace_shop.etsy_connection.last_synced_at|timesince }} ago{% endif %}</small>{% if workspace_shop.etsy_connection.last_error %}<small class="sync-error">{{ workspace_shop.etsy_connection.last_error|truncatechars:100 }}</small>{% endif %}{% else %}<small>Manual CSV only</small>{% endif %}</div>
-            <div class="actions">
-              <span class="status {% if workspace_shop.etsy_connection %}status-profitable{% endif %}">{% if workspace_shop.etsy_connection %}Etsy connected{% else %}Not connected{% endif %}</span>
+          <article class="shop-row{% if not workspace_shop.is_active %} shop-inactive{% endif %}">
+            <div class="shop-identity"><div class="shop-title"><strong>{{ workspace_shop.name }}</strong><span class="status {% if workspace_shop.is_active %}status-profitable{% endif %}">{% if workspace_shop.is_active %}Active{% else %}Inactive{% endif %}</span></div><span>{{ workspace_shop.get_marketplace_display }} · {{ workspace_shop.currency }}</span>{% if workspace_shop.etsy_connection %}<small>Connected{% if workspace_shop.etsy_connection.last_synced_at %} · Synced {{ workspace_shop.etsy_connection.last_synced_at|timesince }} ago{% endif %}</small>{% if workspace_shop.etsy_connection.last_error %}<small class="sync-error">{{ workspace_shop.etsy_connection.last_error|truncatechars:100 }}</small>{% endif %}{% else %}<small>Manual CSV import</small>{% endif %}</div>
+            <dl class="shop-metrics"><div><dt>Orders</dt><dd>{{ workspace_shop.order_count }}</dd></div><div><dt>Costed SKUs</dt><dd>{{ workspace_shop.cost_count }}</dd></div><div><dt>Gross sales</dt><dd>{{ workspace_shop.currency }} {{ workspace_shop.gross_sales|floatformat:2 }}</dd></div><div><dt>Net profit</dt><dd class="{% if workspace_shop.net_profit < 0 %}profit-loss{% else %}profit-profitable{% endif %}">{{ workspace_shop.currency }} {{ workspace_shop.net_profit|floatformat:2 }}</dd></div></dl>
+            <div class="shop-actions">
+              <span class="status {% if workspace_shop.etsy_connection and workspace_shop.etsy_connection.is_active %}status-profitable{% endif %}">{% if workspace_shop.etsy_connection and workspace_shop.etsy_connection.is_active %}Etsy connected{% else %}Not connected{% endif %}</span>
               {% if can_manage_shops and workspace_shop.is_active %}{% if workspace_shop.etsy_connection %}<form method="post" action="{% url 'etsy_sync' workspace_shop.id %}">{% csrf_token %}<button class="primary-button compact" type="submit">Sync now</button></form><form method="post" action="{% url 'etsy_disconnect' workspace_shop.id %}">{% csrf_token %}<button class="text-button danger" type="submit">Disconnect</button></form>{% else %}<a class="primary-button compact" href="{% url 'etsy_connect' workspace_shop.id %}">Connect Etsy</a>{% endif %}{% endif %}
               {% if can_manage_shops %}<form method="post" action="{% url 'toggle_shop' workspace_shop.id %}">{% csrf_token %}<button class="secondary-button compact" type="submit">{% if workspace_shop.is_active %}Deactivate{% else %}Activate{% endif %}</button></form>{% endif %}
             </div>

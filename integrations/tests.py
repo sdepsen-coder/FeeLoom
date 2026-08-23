@@ -13,7 +13,7 @@ from workspaces.models import Membership, Shop, Workspace
 
 from .crypto import decrypt_token, encrypt_token
 from .models import EtsyConnection, EtsySyncRun
-from .etsy import get_receipts
+from .etsy import EtsyAPIError, get_owner_shop, get_receipts
 from .sync import SyncAlreadyRunning, sync_connection
 from .views import OAUTH_SESSION_KEY
 
@@ -171,6 +171,15 @@ class EtsyIntegrationTests(TestCase):
         self.assertEqual([receipt["receipt_id"] for receipt in receipts], [1, 2, 3])
         self.assertIn("offset=0", request_json_mock.call_args_list[0].args[0])
         self.assertIn("offset=2", request_json_mock.call_args_list[1].args[0])
+
+    @patch("integrations.etsy.request_json")
+    def test_missing_owner_shop_has_actionable_error(self, request_json_mock):
+        request_json_mock.side_effect = EtsyAPIError(
+            "Could not find a shop for user with user_id = 12345"
+        )
+
+        with self.assertRaisesRegex(EtsyAPIError, "does not own an active shop"):
+            get_owner_shop("12345", "token")
 
     def test_overlapping_sync_is_rejected(self):
         connection = EtsyConnection.objects.create(

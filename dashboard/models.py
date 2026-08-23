@@ -10,7 +10,7 @@ class Feedback(models.Model):
         USABILITY = "usability", "Something is confusing"
         MISSING_FEATURE = "missing_feature", "Missing feature"
         BUG = "bug", "Something is broken"
-        OTHER = "other", "Other"
+        GENERAL = "other", "General feedback"
 
     class Status(models.TextChoices):
         NEW = "new", "New"

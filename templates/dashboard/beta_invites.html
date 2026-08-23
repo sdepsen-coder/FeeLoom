@@ -1,21 +1,22 @@
 {% extends "base.html" %}
 {% block title %}Beta invites | FeeLoom{% endblock %}
 {% block content %}
-  <header class="page-heading"><div><p class="eyebrow">BETA ACCESS</p><h1>Invite sellers</h1></div></header>
-  {% if created_invite %}<div class="setup-banner"><div><strong>Invite ready</strong><span>Share this code with the seller you want to invite.</span></div><div class="invite-share"><code class="invite-code">{{ created_invite.code }}</code><button class="secondary-button compact copy-invite" type="button" data-code="{{ created_invite.code }}">Copy code</button></div></div>{% endif %}
+  <header class="page-heading"><div><p class="eyebrow">BETA ACCESS</p><h1>Invite sellers</h1><p class="heading-note">Give selected Etsy sellers their own private FeeLoom workspace.</p></div></header>
+  <section class="sales-summary invite-summary" aria-label="Beta invite summary"><div><span>Invite codes</span><strong>{{ invite_count }}</strong></div><div><span>Available</span><strong>{{ available_invite_count }}</strong></div><div><span>Accounts created</span><strong>{{ invite_use_count }}</strong></div><div><span>Uses remaining</span><strong>{{ invite_remaining_uses }}</strong></div></section>
+  {% if created_invite %}<div class="setup-banner"><div><strong>Invite ready</strong><span>Share this private signup link with the seller.</span></div><div class="invite-share"><code class="invite-code">{{ created_invite.code }}</code><button class="primary-button compact copy-invite" type="button" data-copy="{{ created_invite.signup_url }}">Copy invite link</button></div></div>{% endif %}
   <div class="split-layout invite-layout">
     <section>
       <div class="section-heading"><div><h2>Invite codes</h2><p>Each invited seller creates a separate private workspace.</p></div></div>
       <div class="shop-list">
         {% for invite in invites %}
-          <article class="shop-row">
-            <div><strong><code>{{ invite.code }}</code></strong><span>{{ invite.label|default:"Beta invite" }} · {{ invite.use_count }} of {{ invite.max_uses }} used</span><small>Expires {{ invite.expires_at|date:"M j, Y" }}</small></div>
-            <div class="actions"><span class="status {% if invite.is_available %}status-profitable{% endif %}">{% if invite.is_available %}Available{% elif invite.use_count >= invite.max_uses %}Fully used{% elif not invite.is_active %}Disabled{% else %}Expired{% endif %}</span><form method="post" action="{% url 'toggle_invite' invite.id %}">{% csrf_token %}<button class="secondary-button compact" type="submit">{% if invite.is_active %}Disable{% else %}Enable{% endif %}</button></form></div>
+          <article class="shop-row invite-row">
+            <div class="invite-identity"><div class="invite-title"><strong>{{ invite.label|default:"Beta invite" }}</strong><code>{{ invite.code }}</code></div><span>{{ invite.use_count }} of {{ invite.max_uses }} uses claimed</span><div class="invite-usage" aria-label="{{ invite.use_count }} of {{ invite.max_uses }} uses claimed"><span style="width:{% widthratio invite.use_count invite.max_uses 100 %}%"></span></div><small>Expires {{ invite.expires_at|date:"M j, Y" }}</small></div>
+            <div class="actions"><span class="status {% if invite.is_available %}status-profitable{% endif %}">{% if invite.is_available %}Available{% elif invite.use_count >= invite.max_uses %}Fully used{% elif not invite.is_active %}Disabled{% else %}Expired{% endif %}</span>{% if invite.is_available %}<button class="secondary-button compact copy-invite" type="button" data-copy="{{ invite.signup_url }}">Copy link</button>{% endif %}<form method="post" action="{% url 'toggle_invite' invite.id %}">{% csrf_token %}<button class="secondary-button compact" type="submit">{% if invite.is_active %}Disable{% else %}Enable{% endif %}</button></form></div>
           </article>
         {% empty %}<p class="empty-state">No invite codes yet.</p>{% endfor %}
       </div>
     </section>
     <aside class="form-panel"><h2>Create invite</h2><form method="post" class="stack-form">{% csrf_token %}{{ form.as_p }}<button class="primary-button" type="submit">Create invite code</button></form></aside>
   </div>
-  <script>document.querySelectorAll(".copy-invite").forEach(function(button){button.addEventListener("click",function(){navigator.clipboard.writeText(button.dataset.code).then(function(){button.textContent="Copied";setTimeout(function(){button.textContent="Copy code";},1500);});});});</script>
+  <script>document.querySelectorAll(".copy-invite").forEach(function(button){button.addEventListener("click",function(){var original=button.textContent;navigator.clipboard.writeText(button.dataset.copy).then(function(){button.textContent="Copied";setTimeout(function(){button.textContent=original;},1500);});});});</script>
 {% endblock %}

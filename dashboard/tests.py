@@ -22,7 +22,7 @@ from django.utils import timezone
 
 from accounts.models import BetaInvite, LegalAcceptance
 from integrations.models import EtsyConnection
-from sales.models import ImportBatch, Order, OrderItem, ProductCost
+from sales.models import FeeLine, ImportBatch, Order, OrderItem, ProductCost
 from workspaces.models import Membership, Shop, Workspace
 from workspaces.selectors import ACTIVE_SHOP_SESSION_KEY, ALL_SHOPS_VALUE
 
@@ -115,6 +115,19 @@ class DashboardTests(TestCase):
             unit_price=Decimal("40.00"),
         )
 
+    def test_public_landing_page_shows_product_and_beta_actions(self):
+        response = self.client.get(reverse("landing"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Know what every Etsy order actually earns.")
+        self.assertContains(response, reverse("signup"))
+        self.assertContains(response, reverse("login"))
+
+    def test_dashboard_remains_private_after_landing_page_is_added(self):
+        response = self.client.get(reverse("dashboard"))
+
+        self.assertRedirects(response, f'{reverse("login")}?next={reverse("dashboard")}')
+
     def test_dashboard_requires_login(self):
         response = self.client.get(reverse("dashboard"))
 
@@ -166,6 +179,26 @@ class DashboardTests(TestCase):
         self.assertContains(sales_response, "ORDER-100")
         self.assertContains(sales_response, "Ceramic Mug")
 
+    def test_dashboard_period_filter_changes_metrics(self):
+        Order.objects.create(
+            shop=self.shop,
+            external_order_id="ORDER-OLD",
+            ordered_at=timezone.now() - timedelta(days=45),
+            item_revenue=Decimal("100.00"),
+            net_profit=Decimal("60.00"),
+            margin_percent=Decimal("60.00"),
+            profit_status=Order.ProfitStatus.PROFITABLE,
+        )
+        self.client.force_login(self.user)
+
+        default_response = self.client.get(reverse("dashboard"))
+        all_time_response = self.client.get(reverse("dashboard"), {"period": "all"})
+
+        self.assertContains(default_response, "USD 40.00")
+        self.assertNotContains(default_response, "USD 140.00")
+        self.assertContains(all_time_response, "USD 140.00")
+        self.assertContains(all_time_response, 'value="all" class="active"')
+
     def test_authenticated_layout_has_accessible_mobile_navigation(self):
         self.client.force_login(self.user)
 
@@ -184,6 +217,28 @@ class DashboardTests(TestCase):
         self.assertContains(response, 'class="order-table"')
         self.assertContains(response, 'data-label="Net profit"')
         self.assertContains(response, 'data-label="Margin"')
+
+    def test_sales_sort_and_summary_follow_filtered_orders(self):
+        lower_profit = Order.objects.create(
+            shop=self.shop,
+            external_order_id="ORDER-LOW",
+            ordered_at=timezone.now() - timedelta(minutes=1),
+            item_revenue=Decimal("20.00"),
+            net_profit=Decimal("-5.00"),
+            margin_percent=Decimal("-25.00"),
+            profit_status=Order.ProfitStatus.LOSS,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            reverse("sales_table"),
+            {"status": Order.ProfitStatus.LOSS, "sort": "profit_low"},
+        )
+
+        self.assertEqual(list(response.context["orders"]), [lower_profit])
+        self.assertEqual(response.context["sales_gross"], Decimal("20.00"))
+        self.assertEqual(response.context["sales_net_profit"], Decimal("-5.00"))
+        self.assertContains(response, "Lowest profit")
 
     def test_other_workspace_order_is_hidden(self):
         other_user = User.objects.create_user(username="other")
@@ -206,6 +261,37 @@ class DashboardTests(TestCase):
         self.assertNotContains(list_response, "HIDDEN-1")
         self.assertEqual(detail_response.status_code, 404)
 
+    def test_order_detail_remains_available_after_switching_shops(self):
+        second_shop = Shop.objects.create(workspace=self.workspace, name="Second Shop")
+        self.client.force_login(self.user)
+        session = self.client.session
+        session[ACTIVE_SHOP_SESSION_KEY] = second_shop.id
+        session.save()
+
+        response = self.client.get(reverse("sale_detail", args=[self.order.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ORDER-100")
+        self.assertContains(response, "Demo Shop")
+
+    def test_sale_detail_explains_profit_and_fee_lines(self):
+        FeeLine.objects.create(
+            order=self.order,
+            fee_type=FeeLine.FeeType.TRANSACTION,
+            amount=Decimal("4.00"),
+            description="Etsy transaction fee",
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("sale_detail", args=[self.order.id]))
+
+        self.assertEqual(response.context["total_costs"], Decimal("20.00"))
+        self.assertEqual(response.context["fee_rate"], Decimal("10.0"))
+        self.assertEqual(response.context["item_quantity"], 1)
+        self.assertContains(response, "Profit equation")
+        self.assertContains(response, "Fee breakdown")
+        self.assertContains(response, "Etsy transaction fee")
+
     def test_product_cost_is_saved_to_current_shop(self):
         self.client.force_login(self.user)
 
@@ -224,6 +310,33 @@ class DashboardTests(TestCase):
         cost = ProductCost.objects.get(shop=self.shop, sku="MUG-100")
         self.assertEqual(response.status_code, 302)
         self.assertEqual(cost.unit_cost, Decimal("10.00"))
+
+    def test_product_cost_search_and_summary_are_scoped(self):
+        ProductCost.objects.create(
+            shop=self.shop,
+            sku="RING-1",
+            title="Silver Ring",
+            materials=Decimal("5.00"),
+            packaging=Decimal("1.00"),
+            labor=Decimal("3.00"),
+            overhead=Decimal("1.00"),
+        )
+        ProductCost.objects.create(
+            shop=self.shop,
+            sku="MUG-1",
+            title="Ceramic Mug",
+            materials=Decimal("2.00"),
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("product_costs"), {"q": "ring"})
+
+        self.assertContains(response, "RING-1")
+        self.assertNotContains(response, "MUG-1")
+        self.assertEqual(response.context["cost_count"], 1)
+        self.assertEqual(response.context["average_unit_cost"], Decimal("10.00"))
+        self.assertContains(response, "Packaging")
+        self.assertContains(response, "Overhead")
 
     def test_csv_export_contains_filtered_shop_orders(self):
         self.client.force_login(self.user)
@@ -370,6 +483,27 @@ class DashboardTests(TestCase):
         self.assertEqual(new_shop.currency, "USD")
         self.assertEqual(self.client.session[ACTIVE_SHOP_SESSION_KEY], new_shop.id)
 
+    def test_shops_page_shows_per_shop_business_summary(self):
+        ProductCost.objects.create(
+            shop=self.shop,
+            sku="SUMMARY-1",
+            title="Summary item",
+            materials=Decimal("5.00"),
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("shops"))
+
+        workspace_shop = response.context["workspace_shops"][0]
+        self.assertEqual(response.context["shop_count"], 1)
+        self.assertEqual(response.context["active_shop_count"], 1)
+        self.assertEqual(response.context["shop_order_count"], 1)
+        self.assertEqual(workspace_shop.order_count, 1)
+        self.assertEqual(workspace_shop.cost_count, 1)
+        self.assertEqual(workspace_shop.gross_sales, Decimal("40.00"))
+        self.assertEqual(workspace_shop.net_profit, Decimal("20.00"))
+        self.assertContains(response, "Costed SKUs")
+
     def test_import_rejects_shop_from_another_workspace(self):
         other_user = User.objects.create_user(username="import-outsider")
         other_workspace = Workspace.objects.create(
@@ -410,7 +544,10 @@ class DashboardTests(TestCase):
         )
 
         submission = Feedback.objects.get()
-        self.assertRedirects(response, f"{reverse('feedback')}?sent=1")
+        self.assertRedirects(
+            response,
+            f"{reverse('feedback')}?sent=1&from=%2Fsales%2F1%2F",
+        )
         self.assertEqual(submission.workspace, self.workspace)
         self.assertEqual(submission.shop, self.shop)
         self.assertEqual(submission.user, self.user)
@@ -438,7 +575,10 @@ class DashboardTests(TestCase):
             },
         )
 
-        self.assertRedirects(response, f"{reverse('feedback')}?sent=1")
+        self.assertRedirects(
+            response,
+            f"{reverse('feedback')}?sent=1&from=%2Fsales%2F",
+        )
         self.assertTrue(Feedback.objects.filter(message="The filter stopped responding.").exists())
         send_mail_mock.assert_called_once()
 
@@ -448,8 +588,22 @@ class DashboardTests(TestCase):
         response = self.client.get(reverse("feedback"))
 
         self.assertContains(response, "1 = worst, 5 = best")
-        self.assertContains(response, "1 - Worst")
-        self.assertContains(response, "5 - Best")
+        self.assertEqual(response.content.decode().count('type="radio"'), 5)
+        self.assertContains(response, "General feedback")
+
+    def test_feedback_shows_safe_source_page_and_return_link(self):
+        self.client.force_login(self.user)
+
+        form_response = self.client.get(reverse("feedback"), {"from": "/costs/"})
+        sent_response = self.client.get(
+            reverse("feedback"),
+            {"sent": "1", "from": "/costs/"},
+        )
+
+        self.assertContains(form_response, "Feedback about")
+        self.assertContains(form_response, "/costs/")
+        self.assertContains(sent_response, "Back to previous page")
+        self.assertContains(sent_response, 'href="/costs/"')
 
     def test_feedback_rejects_external_source_url(self):
         self.client.force_login(self.user)
@@ -471,9 +625,22 @@ class DashboardTests(TestCase):
 
         response = self.client.get(reverse("getting_started"))
 
-        self.assertContains(response, "2 of 3 complete")
-        self.assertContains(response, "Shop created")
-        self.assertContains(response, "Orders imported")
+        self.assertContains(response, "2 of 4 complete")
+        self.assertContains(response, "Shop ready")
+        self.assertContains(response, "Sales data ready")
+        self.assertContains(response, "Add costs for 1 sold SKU.")
+
+    def test_getting_started_uses_workspace_data_after_switching_to_empty_shop(self):
+        empty_shop = Shop.objects.create(workspace=self.workspace, name="Empty Shop")
+        self.client.force_login(self.user)
+        session = self.client.session
+        session[ACTIVE_SHOP_SESSION_KEY] = empty_shop.id
+        session.save()
+
+        response = self.client.get(reverse("getting_started"))
+
+        self.assertContains(response, "2 of 4 complete")
+        self.assertTrue(response.context["setup_steps"][1]["done"])
 
     def test_sample_etsy_csv_can_be_downloaded(self):
         self.client.force_login(self.user)
@@ -485,6 +652,23 @@ class DashboardTests(TestCase):
         self.assertEqual(response["Content-Type"], "text/csv")
         self.assertIn("attachment", response["Content-Disposition"])
         self.assertIn(b"Order ID", content)
+
+    def test_privacy_page_shows_workspace_data_inventory(self):
+        ProductCost.objects.create(
+            shop=self.shop,
+            sku="PRIVACY-1",
+            materials=Decimal("3.00"),
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("privacy_data"))
+
+        stats = {item["label"]: item["value"] for item in response.context["privacy_stats"]}
+        self.assertEqual(stats["Shops"], 1)
+        self.assertEqual(stats["Orders"], 1)
+        self.assertEqual(stats["Product costs"], 1)
+        self.assertContains(response, "Data inventory")
+        self.assertContains(response, "Danger zone")
 
     def test_workspace_export_contains_only_current_workspace_and_no_tokens(self):
         LegalAcceptance.objects.create(user=self.user, version="2026-08-21")
@@ -552,6 +736,7 @@ class DashboardTests(TestCase):
         self.assertTrue(Workspace.objects.filter(id=self.workspace.id).exists())
         self.assertContains(response, "Enter the workspace name exactly as shown.", status_code=400)
         self.assertContains(response, "Your password is incorrect.", status_code=400)
+        self.assertContains(response, '<details class="detail-block danger-panel" open>', status_code=400)
 
     def test_workspace_owner_can_delete_only_workspace_and_account(self):
         self.client.force_login(self.user)
@@ -603,6 +788,13 @@ class DashboardTests(TestCase):
         self.assertRedirects(response, f"{reverse('beta_invites')}?created={invite.id}")
         self.assertEqual(invite.max_uses, 2)
         self.assertTrue(invite.is_available)
+        invite_page = self.client.get(f"{reverse('beta_invites')}?created={invite.id}")
+        self.assertEqual(invite_page.context["available_invite_count"], 1)
+        self.assertEqual(invite_page.context["invite_remaining_uses"], 2)
+        self.assertContains(
+            invite_page,
+            f"{reverse('signup')}?invite={invite.code}",
+        )
         created_event = AuditEvent.objects.get(action="beta_invite.created")
         self.assertEqual(created_event.workspace, self.workspace)
         self.assertEqual(created_event.user, self.user)
@@ -682,6 +874,36 @@ class DashboardTests(TestCase):
         self.assertContains(response, "visible-request")
         self.assertNotContains(response, "Private activity")
         self.assertNotContains(response, "private-request")
+
+    def test_activity_filters_by_category_shop_and_search(self):
+        second_shop = Shop.objects.create(workspace=self.workspace, name="Activity Shop")
+        AuditEvent.objects.create(
+            workspace=self.workspace,
+            shop=self.shop,
+            user=self.user,
+            action="sales.imported",
+            summary="Imported summer orders",
+            request_id="sales-request",
+        )
+        AuditEvent.objects.create(
+            workspace=self.workspace,
+            shop=second_shop,
+            user=self.user,
+            action="shop.created",
+            summary="Created another shop",
+            request_id="shop-request",
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            reverse("activity"),
+            {"q": "summer", "category": "sales.", "shop": self.shop.id},
+        )
+
+        self.assertEqual(response.context["activity_count"], 1)
+        self.assertContains(response, "Imported summer orders")
+        self.assertNotContains(response, "Created another shop")
+        self.assertContains(response, "Sales and imports")
 
     def test_owner_cannot_toggle_another_workspace_invite(self):
         self.user.is_staff = True
@@ -920,6 +1142,53 @@ class SystemStatusTests(TestCase):
         submission.refresh_from_db()
         self.assertRedirects(update_response, reverse("feedback_inbox"))
         self.assertEqual(submission.status, Feedback.Status.REVIEWING)
+
+    def test_superuser_can_filter_feedback_and_keep_filters_after_review(self):
+        matching = Feedback.objects.create(
+            workspace=self.workspace,
+            shop=self.shop,
+            user=self.admin,
+            category=Feedback.Category.GENERAL,
+            rating=5,
+            message="The profit view is useful.",
+            page_path="/sales/",
+        )
+        Feedback.objects.create(
+            workspace=self.workspace,
+            shop=self.shop,
+            user=self.admin,
+            category=Feedback.Category.BUG,
+            rating=1,
+            message="The import page needs attention.",
+            page_path="/sales/import/",
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse("feedback_inbox"),
+            {"q": "profit", "category": "other", "status": "new", "rating": "5"},
+        )
+
+        self.assertEqual(response.context["feedback_match_count"], 1)
+        self.assertContains(response, "The profit view is useful.")
+        self.assertNotContains(response, "The import page needs attention.")
+
+        update_response = self.client.post(
+            reverse("update_feedback_status", args=[matching.id]),
+            {
+                "status": Feedback.Status.REVIEWING,
+                "status_filter": Feedback.Status.NEW,
+                "category_filter": "other",
+                "rating_filter": "5",
+                "q": "profit",
+            },
+        )
+        matching.refresh_from_db()
+        expected_url = (
+            f'{reverse("feedback_inbox")}?status=new&category=other&rating=5&q=profit'
+        )
+        self.assertRedirects(update_response, expected_url)
+        self.assertEqual(matching.status, Feedback.Status.REVIEWING)
 
     @override_settings(
         EMAIL_DELIVERY_ENABLED=True,

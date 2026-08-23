@@ -30,6 +30,12 @@ class ProductCostForm(forms.ModelForm):
     class Meta:
         model = ProductCost
         fields = ("sku", "title", "materials", "packaging", "labor", "overhead")
+        labels = {
+            "materials": "Materials cost",
+            "packaging": "Packaging cost",
+            "labor": "Labor cost",
+            "overhead": "Overhead cost",
+        }
         widgets = {
             field: forms.NumberInput(attrs={"step": "0.01", "min": "0"})
             for field in ("materials", "packaging", "labor", "overhead")
@@ -48,21 +54,26 @@ class ShopForm(forms.ModelForm):
 
 class FeedbackForm(forms.ModelForm):
     rating = forms.TypedChoiceField(
-        label="How useful is FeeLoom? (1 = worst, 5 = best)",
+        label="How useful is FeeLoom?",
+        help_text="1 = worst, 5 = best",
         coerce=int,
         choices=(
-            (1, "1 - Worst"),
+            (1, "1"),
             (2, "2"),
-            (3, "3 - Neutral"),
+            (3, "3"),
             (4, "4"),
-            (5, "5 - Best"),
+            (5, "5"),
         ),
+        widget=forms.RadioSelect(attrs={"class": "rating-choice"}),
     )
 
     class Meta:
         model = Feedback
         fields = ("category", "rating", "message", "page_path")
-        labels = {"message": "Tell us what happened"}
+        labels = {
+            "category": "What is this about?",
+            "message": "Tell us what happened",
+        }
         widgets = {
             "message": forms.Textarea(
                 attrs={

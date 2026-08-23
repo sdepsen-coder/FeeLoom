@@ -121,7 +121,14 @@ def active_access_token(connection):
 
 
 def get_owner_shop(user_id, access_token):
-    return request_json(f"{API_ROOT}/users/{user_id}/shops", access_token=access_token)
+    try:
+        return request_json(f"{API_ROOT}/users/{user_id}/shops", access_token=access_token)
+    except EtsyAPIError as exc:
+        if "Could not find a shop for user" in str(exc):
+            raise EtsyAPIError(
+                "This Etsy account does not own an active shop. Sign in with a seller account and try again."
+            ) from exc
+        raise
 
 
 def get_receipts(shop_id, access_token, *, min_last_modified=None, page_size=100, max_pages=50):

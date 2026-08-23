@@ -1,9 +1,20 @@
 {% extends "base.html" %}
 {% block title %}Product costs | FeeLoom{% endblock %}
 {% block content %}
-  <header class="page-heading"><div><p class="eyebrow">COST LIBRARY</p><h1>Product costs</h1></div></header>
-  <div class="split-layout">
-    <section><div class="section-heading"><div><h2>Saved products</h2><p>Unit costs used in profit calculations</p></div></div><div class="table-wrap"><table><thead><tr>{% if all_shops %}<th>Shop</th>{% endif %}<th>SKU</th><th>Product</th><th class="numeric">Materials</th><th class="numeric">Labor</th><th class="numeric">Unit cost</th></tr></thead><tbody>{% for cost in costs %}<tr>{% if all_shops %}<td>{{ cost.shop.name }}</td>{% endif %}<td>{{ cost.sku }}</td><td>{{ cost.title|default:"-" }}</td><td class="numeric">{{ cost.shop.currency }} {{ cost.materials|floatformat:2 }}</td><td class="numeric">{{ cost.shop.currency }} {{ cost.labor|floatformat:2 }}</td><td class="numeric"><strong>{{ cost.shop.currency }} {{ cost.unit_cost|floatformat:2 }}</strong></td></tr>{% empty %}<tr><td colspan="6" class="empty-state">No product costs saved yet.</td></tr>{% endfor %}</tbody></table></div></section>
-    <aside class="form-panel"><h2>Add or update cost</h2>{% if all_shops %}<p class="form-note">Choose one shop above to save its product costs.</p>{% else %}<form method="post" class="stack-form">{% csrf_token %}{{ form.as_p }}<button class="primary-button" type="submit">Save cost</button></form>{% endif %}</aside>
+  <header class="page-heading"><div><p class="eyebrow">COST LIBRARY</p><h1>Product costs</h1><p class="form-note">{{ cost_count }} matching product{{ cost_count|pluralize }}</p></div></header>
+  {% if shop and not all_shops %}
+    <section class="cost-summary" aria-label="Product cost summary">
+      <div><span>Products</span><strong>{{ cost_count }}</strong></div>
+      <div><span>Materials total</span><strong>{{ shop.currency }} {{ cost_materials|floatformat:2 }}</strong></div>
+      <div><span>Labor total</span><strong>{{ shop.currency }} {{ cost_labor|floatformat:2 }}</strong></div>
+      <div><span>Average unit cost</span><strong>{{ shop.currency }} {{ average_unit_cost|floatformat:2 }}</strong></div>
+    </section>
+  {% endif %}
+  <div class="cost-layout">
+    <section>
+      <div class="section-heading cost-heading"><div><h2>Saved products</h2><p>Unit costs used in profit calculations</p></div><form class="compact-search" method="get"><input type="search" name="q" value="{{ cost_query }}" placeholder="Search SKU or product" aria-label="Search product costs"><button class="secondary-button compact" type="submit">Search</button>{% if cost_query %}<a class="clear-link" href="{% url 'product_costs' %}">Clear</a>{% endif %}</form></div>
+      <div class="table-wrap cost-table-wrap"><table><thead><tr>{% if all_shops %}<th>Shop</th>{% endif %}<th>SKU</th><th>Product</th><th class="numeric">Materials</th><th class="numeric">Packaging</th><th class="numeric">Labor</th><th class="numeric">Overhead</th><th class="numeric">Unit cost</th></tr></thead><tbody>{% for cost in costs %}<tr>{% if all_shops %}<td>{{ cost.shop.name }}</td>{% endif %}<td><strong>{{ cost.sku }}</strong></td><td>{{ cost.title|default:"-" }}</td><td class="numeric">{{ cost.shop.currency }} {{ cost.materials|floatformat:2 }}</td><td class="numeric">{{ cost.shop.currency }} {{ cost.packaging|floatformat:2 }}</td><td class="numeric">{{ cost.shop.currency }} {{ cost.labor|floatformat:2 }}</td><td class="numeric">{{ cost.shop.currency }} {{ cost.overhead|floatformat:2 }}</td><td class="numeric"><strong>{{ cost.shop.currency }} {{ cost.unit_cost|floatformat:2 }}</strong></td></tr>{% empty %}<tr><td colspan="8" class="empty-state">No product costs match this search.</td></tr>{% endfor %}</tbody></table></div>
+    </section>
+    <aside class="form-panel cost-form-panel"><h2>Add or update cost</h2><p class="form-note">Saving an existing SKU updates its cost.</p>{% if all_shops %}<p class="form-note">Choose one shop above to save its product costs.</p>{% else %}<form method="post" class="stack-form cost-entry-form">{% csrf_token %}{{ form.as_p }}<button class="primary-button" type="submit">Save cost</button></form>{% endif %}</aside>
   </div>
 {% endblock %}

@@ -1,14 +1,27 @@
 {% extends "base.html" %}
 {% block title %}Activity | FeeLoom{% endblock %}
 {% block content %}
-  <header class="page-heading"><div><p class="eyebrow">OPERATIONS</p><h1>Activity</h1></div></header>
-  <div class="table-wrap">
-    <table>
+  <header class="page-heading"><div><p class="eyebrow">WORKSPACE</p><h1>Activity</h1><p class="heading-note">A traceable history of important workspace changes.</p></div></header>
+  <section class="sales-summary" aria-label="Filtered activity summary">
+    <div><span>Matching events</span><strong>{{ activity_count }}</strong></div>
+    <div><span>People</span><strong>{{ activity_actor_count }}</strong></div>
+    <div><span>Shops affected</span><strong>{{ activity_shop_count }}</strong></div>
+    <div><span>Latest</span><strong class="activity-latest">{% if latest_activity %}{{ latest_activity.created_at|date:"M j, H:i" }}{% else %}-{% endif %}</strong></div>
+  </section>
+  <form method="get" class="filter-bar activity-filter" role="search">
+    <input type="search" name="q" value="{{ activity_query }}" placeholder="Search action, user, or request ID" aria-label="Search activity">
+    <select name="category" aria-label="Activity type"><option value="">All activity</option>{% for value, label in activity_categories %}<option value="{{ value }}" {% if selected_activity_category == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+    <select name="shop" aria-label="Activity shop"><option value="">All shops</option>{% for activity_shop in activity_shops %}<option value="{{ activity_shop.id }}" {% if selected_activity_shop == activity_shop.id|stringformat:"s" %}selected{% endif %}>{{ activity_shop.name }}</option>{% endfor %}</select>
+    <button class="secondary-button" type="submit">Filter</button>
+    {% if activity_query or selected_activity_category or selected_activity_shop %}<a class="clear-link" href="{% url 'activity' %}">Clear</a>{% endif %}
+  </form>
+  <div class="table-wrap order-table-wrap">
+    <table class="order-table activity-table">
       <thead><tr><th>Time</th><th>Action</th><th>Shop</th><th>User</th><th>Request ID</th></tr></thead>
       <tbody>
-        {% for event in activity_page %}<tr><td>{{ event.created_at|date:"M j, Y H:i" }}</td><td><strong>{{ event.summary|default:event.action }}</strong><br><small>{{ event.action }}</small></td><td>{{ event.shop.name|default:"-" }}</td><td>{{ event.user.username|default:"System" }}</td><td><code>{{ event.request_id|default:"-" }}</code></td></tr>{% empty %}<tr><td class="empty-state" colspan="5">No activity recorded yet.</td></tr>{% endfor %}
+        {% for event in activity_page %}<tr><td data-label="Time">{{ event.created_at|date:"M j, Y H:i" }}</td><td class="product-cell" data-label="Action"><strong>{{ event.summary|default:event.action }}</strong><br><small>{{ event.action }}</small></td><td data-label="Shop">{{ event.shop.name|default:"-" }}</td><td data-label="User">{{ event.user.username|default:"System" }}</td><td class="shop-cell request-cell" data-label="Request ID"><code>{{ event.request_id|default:"-" }}</code></td></tr>{% empty %}<tr><td class="empty-state" colspan="5">No activity matches these filters.</td></tr>{% endfor %}
       </tbody>
     </table>
   </div>
-  {% if activity_page.paginator.num_pages > 1 %}<nav class="pagination" aria-label="Activity pages">{% if activity_page.has_previous %}<a class="secondary-button compact" href="?page={{ activity_page.previous_page_number }}">Previous</a>{% endif %}<span>Page {{ activity_page.number }} of {{ activity_page.paginator.num_pages }}</span>{% if activity_page.has_next %}<a class="secondary-button compact" href="?page={{ activity_page.next_page_number }}">Next</a>{% endif %}</nav>{% endif %}
+  {% if activity_page.paginator.num_pages > 1 %}<nav class="pagination" aria-label="Activity pages">{% if activity_page.has_previous %}<a class="secondary-button compact" href="?{% if activity_filter_query %}{{ activity_filter_query }}&{% endif %}page={{ activity_page.previous_page_number }}">Previous</a>{% endif %}<span>Page {{ activity_page.number }} of {{ activity_page.paginator.num_pages }}</span>{% if activity_page.has_next %}<a class="secondary-button compact" href="?{% if activity_filter_query %}{{ activity_filter_query }}&{% endif %}page={{ activity_page.next_page_number }}">Next</a>{% endif %}</nav>{% endif %}
 {% endblock %}

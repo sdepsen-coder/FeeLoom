@@ -2,31 +2,34 @@
 {% block title %}Feedback inbox | FeeLoom{% endblock %}
 {% block content %}
   <header class="page-heading">
-    <div><p class="eyebrow">OPERATIONS</p><h1>Feedback inbox</h1></div>
+    <div><p class="eyebrow">OPERATIONS</p><h1>Feedback inbox</h1><p class="heading-note">Review beta feedback and track every item to resolution.</p></div>
   </header>
-  <form method="get" class="filter-bar">
-    <label for="feedback-status">Status</label>
-    <select id="feedback-status" name="status" onchange="this.form.submit()">
-      <option value="">All statuses</option>
-      {% for value, label in feedback_statuses %}<option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
-    </select>
+  <section class="sales-summary" aria-label="Feedback summary"><div><span>Total</span><strong>{{ feedback_total_count }}</strong></div><div><span>New</span><strong>{{ feedback_new_count }}</strong></div><div><span>Reviewing</span><strong>{{ feedback_reviewing_count }}</strong></div><div><span>Resolved</span><strong>{{ feedback_resolved_count }}</strong></div></section>
+  <form method="get" class="filter-bar feedback-filter" role="search">
+    <input type="search" name="q" value="{{ feedback_query }}" placeholder="Search seller, message, or page" aria-label="Search feedback">
+    <select name="category" aria-label="Feedback category"><option value="">All categories</option>{% for value, label in feedback_categories %}<option value="{{ value }}" {% if category_filter == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+    <select id="feedback-status" name="status" aria-label="Feedback status"><option value="">All statuses</option>{% for value, label in feedback_statuses %}<option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+    <select name="rating" aria-label="Feedback rating"><option value="">All ratings</option>{% for value in feedback_ratings %}<option value="{{ value }}" {% if rating_filter == value|stringformat:"s" %}selected{% endif %}>{{ value }} / 5</option>{% endfor %}</select>
+    <button class="secondary-button" type="submit">Filter</button>{% if feedback_query or status_filter or category_filter or rating_filter %}<a class="clear-link" href="{% url 'feedback_inbox' %}">Clear</a>{% endif %}
   </form>
-  <div class="table-wrap">
-    <table>
+  <p class="filter-result-note">{{ feedback_match_count }} matching feedback item{{ feedback_match_count|pluralize }} · Average rating {{ feedback_average_rating|floatformat:1 }}/5</p>
+  <div class="table-wrap order-table-wrap">
+    <table class="order-table feedback-inbox-table">
       <thead><tr><th>Submitted</th><th>Seller</th><th>Category</th><th>Rating</th><th>Message</th><th>Page</th><th>Status</th></tr></thead>
       <tbody>
         {% for item in feedback_page %}
           <tr>
-            <td>{{ item.created_at|date:"M j, Y H:i" }}</td>
-            <td><strong>{{ item.workspace.name }}</strong><br><span class="form-note">{{ item.shop.name|default:"No shop" }} · {{ item.user.username }}</span></td>
-            <td>{{ item.get_category_display }}</td>
-            <td><strong>{{ item.rating }}/5</strong></td>
-            <td class="feedback-message">{{ item.message }}</td>
-            <td>{{ item.page_path|default:"-" }}</td>
-            <td>
+            <td data-label="Submitted">{{ item.created_at|date:"M j, Y H:i" }}</td>
+            <td class="shop-cell" data-label="Seller"><strong>{{ item.workspace.name }}</strong><br><span class="form-note">{{ item.shop.name|default:"No shop" }} · {{ item.user.username }}</span></td>
+            <td data-label="Category">{{ item.get_category_display }}</td>
+            <td data-label="Rating"><strong>{{ item.rating }}/5</strong></td>
+            <td class="feedback-message product-cell" data-label="Message">{{ item.message }}</td>
+            <td class="shop-cell" data-label="Page"><code>{{ item.page_path|default:"-" }}</code></td>
+            <td class="shop-cell" data-label="Status">
               <form method="post" action="{% url 'update_feedback_status' item.id %}" class="inline-status-form">
                 {% csrf_token %}
                 <input type="hidden" name="status_filter" value="{{ status_filter }}">
+                <input type="hidden" name="category_filter" value="{{ category_filter }}"><input type="hidden" name="rating_filter" value="{{ rating_filter }}"><input type="hidden" name="q" value="{{ feedback_query }}">
                 <select name="status" aria-label="Status for feedback {{ item.id }}">
                   {% for value, label in feedback_statuses %}<option value="{{ value }}" {% if item.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
                 </select>
@@ -42,9 +45,9 @@
   </div>
   {% if feedback_page.has_other_pages %}
     <div class="pagination">
-      {% if feedback_page.has_previous %}<a href="?status={{ status_filter }}&amp;page={{ feedback_page.previous_page_number }}">Previous</a>{% endif %}
+      {% if feedback_page.has_previous %}<a href="?{% if feedback_filter_query %}{{ feedback_filter_query }}&amp;{% endif %}page={{ feedback_page.previous_page_number }}">Previous</a>{% endif %}
       <span>Page {{ feedback_page.number }} of {{ feedback_page.paginator.num_pages }}</span>
-      {% if feedback_page.has_next %}<a href="?status={{ status_filter }}&amp;page={{ feedback_page.next_page_number }}">Next</a>{% endif %}
+      {% if feedback_page.has_next %}<a href="?{% if feedback_filter_query %}{{ feedback_filter_query }}&amp;{% endif %}page={{ feedback_page.next_page_number }}">Next</a>{% endif %}
     </div>
   {% endif %}
 {% endblock %}

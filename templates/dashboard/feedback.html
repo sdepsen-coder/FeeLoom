@@ -1,13 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Feedback | FeeLoom{% endblock %}
 {% block content %}
-  <header class="page-heading"><div><p class="eyebrow">BETA FEEDBACK</p><h1>Help shape FeeLoom</h1></div></header>
+  <header class="page-heading"><div><p class="eyebrow">BETA FEEDBACK</p><h1>Help shape FeeLoom</h1><p class="heading-note">Tell us what helped, what confused you, or what is missing.</p></div></header>
   <div class="feedback-layout">
     <section class="form-panel feedback-panel">
       {% if feedback_sent %}
-        <div class="feedback-thanks"><strong>Thank you.</strong><p>Your feedback has been saved for review.</p><a class="primary-button" href="{% url 'dashboard' %}">Back to overview</a></div>
+        <div class="feedback-thanks"><strong>Thank you.</strong><p>Your feedback has been saved for review.</p><div class="actions">{% if feedback_source_page %}<a class="primary-button" href="{{ feedback_source_page }}">Back to previous page</a>{% else %}<a class="primary-button" href="{% url 'dashboard' %}">Back to overview</a>{% endif %}<a class="secondary-button" href="{% url 'feedback' %}{% if feedback_source_page %}?from={{ feedback_source_page|urlencode }}{% endif %}">Send another</a></div></div>
       {% else %}
         <h2>Share your experience</h2>
+        {% if feedback_source_page %}<p class="feedback-context">Feedback about <code>{{ feedback_source_page }}</code></p>{% endif %}
         <form method="post" class="stack-form">{% csrf_token %}{{ form.as_p }}<button class="primary-button" type="submit">Send feedback</button></form>
         <p class="legal-note">Do not include buyer names, addresses, email addresses, or payment details. An Etsy order number is enough when reporting a calculation.</p>
       {% endif %}

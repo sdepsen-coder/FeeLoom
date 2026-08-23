@@ -1,10 +1,11 @@
 from django.urls import path
 
-from .views import activity, beta_accounts, beta_invites, dashboard, delete_workspace, download_sample_csv, export_sales, export_workspace_data, feedback, feedback_inbox, getting_started, import_sales, privacy_data, product_costs, sale_detail, sales_table, shops, switch_shop, system_status, toggle_invite, toggle_shop, update_feedback_status
+from .views import activity, beta_accounts, beta_invites, dashboard, delete_workspace, download_sample_csv, export_sales, export_workspace_data, feedback, feedback_inbox, getting_started, import_sales, landing, privacy_data, product_costs, sale_detail, sales_table, shops, switch_shop, system_status, toggle_invite, toggle_shop, update_feedback_status
 
 
 urlpatterns = [
-    path("", dashboard, name="dashboard"),
+    path("", landing, name="landing"),
+    path("app/", dashboard, name="dashboard"),
     path("sales/", sales_table, name="sales_table"),
     path("sales/export/", export_sales, name="export_sales"),
     path("sales/import/", import_sales, name="import_sales"),

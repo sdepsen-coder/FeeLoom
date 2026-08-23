@@ -27,6 +27,15 @@ class SignupTests(TestCase):
             expires_at=timezone.now() + timedelta(days=14),
         )
 
+    def test_signup_link_prefills_invite_code(self):
+        response = self.client.get(
+            reverse("signup"),
+            {"invite": self.invite.code.lower()},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["form"]["invite_code"].value(), self.invite.code)
+
     def test_signup_creates_workspace_shop_and_owner_membership(self):
         response = self.client.post(
             reverse("signup"),

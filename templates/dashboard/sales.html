@@ -2,10 +2,17 @@
 {% block title %}Sales | FeeLoom{% endblock %}
 {% block content %}
   <header class="page-heading"><div><p class="eyebrow">SALES</p><h1>Order profitability</h1><p class="form-note">{{ sales_page.paginator.count }} matching orders</p></div><div class="actions"><a class="primary-button" href="{% url 'import_sales' %}">Import sales</a><a class="secondary-button" href="{% url 'export_sales' %}?{{ request.GET.urlencode }}">Download CSV</a></div></header>
+  <section class="sales-summary" aria-label="Filtered sales summary">
+    <div><span>Matching orders</span><strong>{{ sales_page.paginator.count }}</strong></div>
+    <div><span>Gross sales</span><strong>{{ display_currency }} {{ sales_gross|floatformat:2 }}</strong></div>
+    <div><span>Net profit</span><strong class="{% if sales_net_profit < 0 %}profit-loss{% else %}profit-profitable{% endif %}">{{ display_currency }} {{ sales_net_profit|floatformat:2 }}</strong></div>
+    <div><span>Net margin</span><strong>{{ sales_margin|floatformat:1 }}%</strong></div>
+  </section>
   <form class="filter-bar" method="get">
     <input type="search" name="q" value="{{ query }}" placeholder="Search order, product, or SKU" aria-label="Search sales">
     <select name="status" aria-label="Profit status"><option value="">All statuses</option>{% for value, label in profit_statuses %}<option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
-    <button class="secondary-button" type="submit">Filter</button>{% if query or selected_status %}<a class="clear-link" href="{% url 'sales_table' %}">Clear</a>{% endif %}
+    <select name="sort" aria-label="Sort sales">{% for value, label in sort_options %}<option value="{{ value }}" {% if selected_sort == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+    <button class="secondary-button" type="submit">Filter</button>{% if query or selected_status or selected_sort != 'newest' %}<a class="clear-link" href="{% url 'sales_table' %}">Clear</a>{% endif %}
   </form>
   {% include "dashboard/order_table.html" with show_shop=all_shops %}
   {% if sales_page.paginator.num_pages > 1 %}<nav class="pagination" aria-label="Sales pages">{% if sales_page.has_previous %}<a class="secondary-button compact" href="?{% if filter_query %}{{ filter_query }}&amp;{% endif %}page={{ sales_page.previous_page_number }}">Previous</a>{% endif %}<span>Page {{ sales_page.number }} of {{ sales_page.paginator.num_pages }}</span>{% if sales_page.has_next %}<a class="secondary-button compact" href="?{% if filter_query %}{{ filter_query }}&amp;{% endif %}page={{ sales_page.next_page_number }}">Next</a>{% endif %}</nav>{% endif %}

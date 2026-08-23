@@ -1,28 +1,25 @@
 {% extends "base.html" %}
 {% block title %}Privacy & data | FeeLoom{% endblock %}
 {% block content %}
-  <header class="page-heading"><div><p class="eyebrow">WORKSPACE</p><h1>Privacy &amp; data</h1></div></header>
+  <header class="page-heading"><div><p class="eyebrow">WORKSPACE</p><h1>Privacy &amp; data</h1><p class="heading-note">See what FeeLoom stores, export it, or permanently remove it.</p></div></header>
+  <section class="sales-summary" aria-label="Workspace data summary">{% for stat in privacy_stats %}<div><span>{{ stat.label }}</span><strong>{{ stat.value }}</strong></div>{% endfor %}</section>
   <div class="privacy-layout">
     <section class="detail-block data-panel">
       <div><h2>Download workspace data</h2><p>Export the shops, orders, costs, imports, feedback, and Etsy connection history stored for {{ membership.workspace.name }}.</p></div>
       {% if can_delete_workspace %}<a class="secondary-button" href="{% url 'export_workspace_data' %}">Download JSON</a>{% else %}<p class="form-note">Only the workspace owner can download the complete workspace export.</p>{% endif %}
-      <small>Etsy access and refresh tokens are never included.</small>
+      <small>Etsy access and refresh tokens are never included.{% if last_workspace_export %} Last exported {{ last_workspace_export.created_at|timesince }} ago.{% endif %}</small>
     </section>
     <section class="detail-block data-panel">
-      <div><h2>How FeeLoom handles this workspace</h2><p>FeeLoom uses the information you provide or import to calculate and display shop profitability. Connected Etsy credentials are stored encrypted and are removed when their shop or workspace is deleted.</p></div>
+      <div><h2>Data inventory</h2><p>FeeLoom uses the information you provide or import to calculate and display shop profitability.</p></div>
+      <dl class="data-inventory">{% for item in privacy_inventory %}<div><dt>{{ item.label }}</dt><dd>{{ item.value }}</dd></div>{% endfor %}</dl>
+      <p>Connected Etsy credentials are stored encrypted and are removed when their shop or workspace is deleted.</p>
       <p class="legal-note">Avoid entering buyer personal information in feedback. Download your data before deletion if you need to keep a copy.</p>
     </section>
-    <section class="detail-block danger-panel">
-      <div><h2>Delete workspace</h2><p>This permanently deletes every shop, order, product cost, import, feedback entry, and Etsy connection in {{ membership.workspace.name }}. If this is your only workspace, your FeeLoom account is also deleted. This cannot be undone.</p></div>
-      {% if can_delete_workspace %}
-        <form method="post" action="{% url 'delete_workspace' %}" class="stack-form">
-          {% csrf_token %}
-          {{ delete_form.as_p }}
-          <button class="danger-button" type="submit">Permanently delete workspace</button>
-        </form>
-      {% else %}
-        <p class="form-note">Only the workspace owner can delete this workspace.</p>
-      {% endif %}
-    </section>
+    <details class="detail-block danger-panel" {% if delete_form.errors %}open{% endif %}>
+      <summary><span><strong>Danger zone</strong><small>Permanent workspace deletion</small></span><span>Review</span></summary>
+      <div class="danger-content"><div><h2>Delete workspace</h2><p>This permanently deletes every shop, order, product cost, import, feedback entry, and Etsy connection in {{ membership.workspace.name }}. If this is your only workspace, your FeeLoom account is also deleted. This cannot be undone.</p></div>
+        {% if can_delete_workspace %}<form method="post" action="{% url 'delete_workspace' %}" class="stack-form">{% csrf_token %}{{ delete_form.as_p }}<button class="danger-button" type="submit">Permanently delete workspace</button></form>{% else %}<p class="form-note">Only the workspace owner can delete this workspace.</p>{% endif %}
+      </div>
+    </details>
   </div>
 {% endblock %}

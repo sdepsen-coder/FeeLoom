@@ -1,8 +1,10 @@
 import csv
 import json
 import logging
+from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
+from urllib.parse import urlencode
 
 import sentry_sdk
 from django.conf import settings
@@ -13,7 +15,8 @@ from django.core.exceptions import PermissionDenied
 from django.core.mail import send_mail
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.paginator import Paginator
-from django.db.models import Count, Q, Sum
+from django.db.models import Avg, Count, Q, Sum
+from django.db.models.functions import TruncDate
 from django.http import FileResponse, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -65,6 +68,7 @@ def filtered_sales(request, context):
     orders = selected_orders(context).select_related("shop").prefetch_related("items")
     query = request.GET.get("q", "").strip()
     status = request.GET.get("status", "").strip()
+    sort = request.GET.get("sort", "newest").strip()
     if query:
         orders = orders.filter(
             Q(external_order_id__icontains=query)
@@ -74,7 +78,23 @@ def filtered_sales(request, context):
         ).distinct()
     if status in Order.ProfitStatus.values:
         orders = orders.filter(profit_status=status)
-    return orders, query, status
+    sort_fields = {
+        "newest": ("-ordered_at", "-id"),
+        "oldest": ("ordered_at", "id"),
+        "profit_high": ("-net_profit", "-ordered_at", "-id"),
+        "profit_low": ("net_profit", "-ordered_at", "-id"),
+    }
+    if sort not in sort_fields:
+        sort = "newest"
+    return orders.order_by(*sort_fields[sort]), query, status, sort
+
+
+def landing(request):
+    return render(
+        request,
+        "landing.html",
+        {"support_email": settings.FEELOOM_SUPPORT_EMAIL or "sdepsen@gmail.com"},
+    )
 
 
 @login_required
@@ -107,7 +127,14 @@ def dashboard(request):
     if not context["membership"]:
         context["support_email"] = settings.FEELOOM_SUPPORT_EMAIL
         return render(request, "dashboard/no_workspace.html", context)
+    period = request.GET.get("period", "30")
+    period_days = {"30": 30, "90": 90, "all": None}.get(period)
+    if period_days is None and period != "all":
+        period = "30"
+        period_days = 30
     orders = selected_orders(context)
+    if period_days:
+        orders = orders.filter(ordered_at__gte=timezone.now() - timedelta(days=period_days))
     totals = orders.aggregate(
         item_revenue=Sum("item_revenue"),
         shipping_revenue=Sum("shipping_revenue"),
@@ -124,6 +151,28 @@ def dashboard(request):
         - money(totals["refunds"])
     )
     net_profit = money(totals["net_profit"])
+    status_counts = dict(
+        orders.values_list("profit_status").annotate(total=Count("id"))
+    )
+    trend_rows = list(
+        orders.annotate(day=TruncDate("ordered_at"))
+        .values("day")
+        .annotate(net_profit=Sum("net_profit"))
+        .order_by("day")
+    )[-12:]
+    trend_peak = max(
+        (abs(money(row["net_profit"])) for row in trend_rows),
+        default=Decimal("1"),
+    ) or Decimal("1")
+    profit_trend = [
+        {
+            "label": row["day"].strftime("%b %d"),
+            "value": money(row["net_profit"]),
+            "height": max(6, round(float(abs(money(row["net_profit"])) / trend_peak) * 100)),
+            "is_loss": money(row["net_profit"]) < 0,
+        }
+        for row in trend_rows
+    ]
     context.update(
         {
             "display_currency": context["shop"].currency if context["shop"] else context["membership"].workspace.currency,
@@ -132,6 +181,12 @@ def dashboard(request):
             "net_profit": net_profit,
             "margin": net_profit / gross_sales * 100 if gross_sales else Decimal("0"),
             "loss_count": orders.filter(profit_status=Order.ProfitStatus.LOSS).count(),
+            "order_count": orders.count(),
+            "profitable_count": status_counts.get(Order.ProfitStatus.PROFITABLE, 0),
+            "low_margin_count": status_counts.get(Order.ProfitStatus.LOW_MARGIN, 0),
+            "incomplete_count": status_counts.get(Order.ProfitStatus.INCOMPLETE, 0),
+            "profit_trend": profit_trend,
+            "selected_period": period,
             "recent_orders": orders.select_related("shop").prefetch_related("items")[:8],
             "show_getting_started": not orders.exists(),
         }
@@ -142,7 +197,21 @@ def dashboard(request):
 @login_required
 def sales_table(request):
     context = workspace_context(request)
-    orders, query, status = filtered_sales(request, context)
+    orders, query, status, sort = filtered_sales(request, context)
+    totals = orders.aggregate(
+        item_revenue=Sum("item_revenue"),
+        shipping_revenue=Sum("shipping_revenue"),
+        discounts=Sum("discounts"),
+        refunds=Sum("refunds"),
+        net_profit=Sum("net_profit"),
+    )
+    gross_sales = (
+        money(totals["item_revenue"])
+        + money(totals["shipping_revenue"])
+        - money(totals["discounts"])
+        - money(totals["refunds"])
+    )
+    net_profit = money(totals["net_profit"])
     sales_page = Paginator(orders, 25).get_page(request.GET.get("page"))
     filter_params = request.GET.copy()
     filter_params.pop("page", None)
@@ -153,7 +222,18 @@ def sales_table(request):
             "filter_query": filter_params.urlencode(),
             "query": query,
             "selected_status": status,
+            "selected_sort": sort,
             "profit_statuses": Order.ProfitStatus.choices,
+            "sort_options": (
+                ("newest", "Newest first"),
+                ("oldest", "Oldest first"),
+                ("profit_high", "Highest profit"),
+                ("profit_low", "Lowest profit"),
+            ),
+            "sales_gross": gross_sales,
+            "sales_net_profit": net_profit,
+            "sales_margin": net_profit / gross_sales * 100 if gross_sales else Decimal("0"),
+            "display_currency": context["shop"].currency if context["shop"] else context["membership"].workspace.currency,
         }
     )
     return render(request, "dashboard/sales.html", context)
@@ -162,7 +242,7 @@ def sales_table(request):
 @login_required
 def export_sales(request):
     context = workspace_context(request)
-    orders, _, _ = filtered_sales(request, context)
+    orders, _, _, _ = filtered_sales(request, context)
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = 'attachment; filename="feeloom-sales.csv"'
     if context["membership"]:
@@ -187,8 +267,24 @@ def export_sales(request):
 @login_required
 def sale_detail(request, order_id):
     context = workspace_context(request)
-    context["order"] = get_object_or_404(
-        selected_orders(context).prefetch_related("items", "fee_lines"), id=order_id
+    workspace_orders = (
+        Order.objects.filter(shop__workspace=context["membership"].workspace)
+        if context["membership"]
+        else Order.objects.none()
+    )
+    order = get_object_or_404(
+        workspace_orders.select_related("shop").prefetch_related("items", "fee_lines"),
+        id=order_id,
+    )
+    total_costs = order.total_fees + order.shipping_cost + order.product_cost
+    context.update(
+        {
+            "order": order,
+            "total_costs": total_costs,
+            "fee_rate": order.total_fees / order.gross_sales * 100 if order.gross_sales else Decimal("0"),
+            "item_quantity": sum(item.quantity for item in order.items.all()),
+            "fee_lines": order.fee_lines.all(),
+        }
     )
     return render(request, "dashboard/sale_detail.html", context)
 
@@ -197,6 +293,7 @@ def sale_detail(request, order_id):
 def product_costs(request):
     context = workspace_context(request)
     shop = context["shop"]
+    query = request.GET.get("q", "").strip()
     form = ProductCostForm(request.POST or None)
     if request.method == "POST":
         if not shop:
@@ -220,7 +317,22 @@ def product_costs(request):
         if context["all_shops"]
         else ProductCost.objects.filter(shop=shop)
     )
-    context.update({"form": form, "costs": costs})
+    if query:
+        costs = costs.filter(Q(sku__icontains=query) | Q(title__icontains=query))
+    costs = list(costs)
+    cost_count = len(costs)
+    cost_total = sum((cost.unit_cost for cost in costs), Decimal("0"))
+    context.update(
+        {
+            "form": form,
+            "costs": costs,
+            "cost_query": query,
+            "cost_count": cost_count,
+            "cost_materials": sum((cost.materials for cost in costs), Decimal("0")),
+            "cost_labor": sum((cost.labor for cost in costs), Decimal("0")),
+            "average_unit_cost": cost_total / cost_count if cost_count else Decimal("0"),
+        }
+    )
     return render(request, "dashboard/costs.html", context)
 
 
@@ -296,11 +408,52 @@ def shops(request):
             )
             request.session[ACTIVE_SHOP_SESSION_KEY] = shop.id
             return redirect("shops")
+    workspace_shops = list(
+        context["membership"].workspace.shops.select_related("etsy_connection").all()
+    ) if context["membership"] else []
+    shop_ids = [workspace_shop.id for workspace_shop in workspace_shops]
+    order_summaries = {
+        row["shop_id"]: row
+        for row in Order.objects.filter(shop_id__in=shop_ids)
+        .values("shop_id")
+        .annotate(
+            order_count=Count("id"),
+            item_revenue=Sum("item_revenue"),
+            shipping_revenue=Sum("shipping_revenue"),
+            discounts=Sum("discounts"),
+            refunds=Sum("refunds"),
+            net_profit=Sum("net_profit"),
+        )
+    }
+    cost_counts = {
+        row["shop_id"]: row["cost_count"]
+        for row in ProductCost.objects.filter(shop_id__in=shop_ids)
+        .values("shop_id")
+        .annotate(cost_count=Count("id"))
+    }
+    for workspace_shop in workspace_shops:
+        summary = order_summaries.get(workspace_shop.id, {})
+        workspace_shop.order_count = summary.get("order_count", 0)
+        workspace_shop.cost_count = cost_counts.get(workspace_shop.id, 0)
+        workspace_shop.gross_sales = (
+            money(summary.get("item_revenue"))
+            + money(summary.get("shipping_revenue"))
+            - money(summary.get("discounts"))
+            - money(summary.get("refunds"))
+        )
+        workspace_shop.net_profit = money(summary.get("net_profit"))
     context.update(
         {
             "form": form,
             "can_manage_shops": can_manage_shops(context["membership"]),
-            "workspace_shops": context["membership"].workspace.shops.select_related("etsy_connection").all() if context["membership"] else [],
+            "workspace_shops": workspace_shops,
+            "shop_count": len(workspace_shops),
+            "active_shop_count": sum(shop.is_active for shop in workspace_shops),
+            "connected_shop_count": sum(
+                hasattr(shop, "etsy_connection") and shop.etsy_connection.is_active
+                for shop in workspace_shops
+            ),
+            "shop_order_count": sum(shop.order_count for shop in workspace_shops),
         }
     )
     return render(request, "dashboard/shops.html", context)
@@ -336,6 +489,8 @@ def feedback(request):
     if not context["membership"]:
         raise PermissionDenied
     source_page = request.GET.get("from", "")[:500]
+    if not source_page.startswith("/") or source_page.startswith("//"):
+        source_page = ""
     initial = {"page_path": source_page}
     form = FeedbackForm(request.POST or None, initial=initial)
     if request.method == "POST" and form.is_valid():
@@ -372,9 +527,50 @@ def feedback(request):
                 )
             except Exception:
                 logger.exception("feedback_notification_failed")
-        return redirect(f"{reverse('feedback')}?sent=1")
-    context.update({"form": form, "feedback_sent": request.GET.get("sent") == "1"})
+        redirect_params = {"sent": "1"}
+        if submission.page_path:
+            redirect_params["from"] = submission.page_path
+        return redirect(f"{reverse('feedback')}?{urlencode(redirect_params)}")
+    context.update(
+        {
+            "form": form,
+            "feedback_sent": request.GET.get("sent") == "1",
+            "feedback_source_page": source_page,
+        }
+    )
     return render(request, "dashboard/feedback.html", context)
+
+
+def privacy_context(request, context, *, delete_form=None):
+    membership = context["membership"]
+    workspace = membership.workspace
+    owner = is_workspace_owner(request, membership)
+    shops = workspace.shops.all()
+    context.update(
+        {
+            "can_delete_workspace": owner,
+            "delete_form": delete_form or DeleteWorkspaceForm(
+                user=request.user,
+                workspace=workspace,
+            ) if owner else None,
+            "privacy_stats": (
+                {"label": "Shops", "value": shops.count()},
+                {"label": "Orders", "value": Order.objects.filter(shop__workspace=workspace).count()},
+                {"label": "Product costs", "value": ProductCost.objects.filter(shop__workspace=workspace).count()},
+                {"label": "Imports", "value": ImportBatch.objects.filter(shop__workspace=workspace).count()},
+            ),
+            "privacy_inventory": (
+                {"label": "Workspace members", "value": workspace.memberships.count()},
+                {"label": "Etsy connections", "value": EtsyConnection.objects.filter(shop__workspace=workspace).count()},
+                {"label": "Feedback entries", "value": workspace.feedback.count()},
+                {"label": "Activity events", "value": workspace.audit_events.count()},
+            ),
+            "last_workspace_export": workspace.audit_events.filter(
+                action="workspace.exported"
+            ).first(),
+        }
+    )
+    return context
 
 
 @login_required
@@ -382,16 +578,7 @@ def privacy_data(request):
     context = workspace_context(request)
     if not context["membership"]:
         raise PermissionDenied
-    owner = is_workspace_owner(request, context["membership"])
-    context.update(
-        {
-            "can_delete_workspace": owner,
-            "delete_form": DeleteWorkspaceForm(
-                user=request.user,
-                workspace=context["membership"].workspace,
-            ) if owner else None,
-        }
-    )
+    privacy_context(request, context)
     return render(request, "dashboard/privacy_data.html", context)
 
 
@@ -525,7 +712,7 @@ def delete_workspace(request):
     workspace = membership.workspace
     form = DeleteWorkspaceForm(request.POST, user=request.user, workspace=workspace)
     if not form.is_valid():
-        context.update({"can_delete_workspace": True, "delete_form": form})
+        privacy_context(request, context, delete_form=form)
         return render(request, "dashboard/privacy_data.html", context, status=400)
     record_audit(
         request,
@@ -562,13 +749,29 @@ def beta_invites(request):
             metadata={"max_uses": invite.max_uses},
         )
         return redirect(f"{reverse('beta_invites')}?created={invite.id}")
-    invites = membership.workspace.beta_invites.select_related("created_by")
+    invites = list(membership.workspace.beta_invites.select_related("created_by"))
+    for invite in invites:
+        invite.signup_url = request.build_absolute_uri(
+            f"{reverse('signup')}?invite={invite.code}"
+        )
     created_id = request.GET.get("created", "")
+    created_invite = next(
+        (invite for invite in invites if str(invite.id) == created_id),
+        None,
+    )
     context.update(
         {
             "form": form,
             "invites": invites,
-            "created_invite": invites.filter(id=created_id).first() if created_id.isdigit() else None,
+            "created_invite": created_invite,
+            "invite_count": len(invites),
+            "available_invite_count": sum(invite.is_available for invite in invites),
+            "invite_use_count": sum(invite.use_count for invite in invites),
+            "invite_remaining_uses": sum(
+                max(invite.max_uses - invite.use_count, 0)
+                for invite in invites
+                if invite.is_available
+            ),
         }
     )
     return render(request, "dashboard/beta_invites.html", context)
@@ -600,10 +803,56 @@ def activity(request):
     membership = context["membership"]
     if not is_workspace_owner(request, membership):
         raise PermissionDenied
+    query = request.GET.get("q", "").strip()
+    selected_category = request.GET.get("category", "")
+    selected_shop = request.GET.get("shop", "")
+    categories = (
+        ("shop.", "Shops"),
+        ("etsy.", "Etsy connections"),
+        ("sales.", "Sales and imports"),
+        ("product_cost.", "Product costs"),
+        ("workspace.", "Workspace data"),
+        ("feedback.", "Feedback"),
+        ("beta_invite.", "Beta invites"),
+        ("system.", "System checks"),
+    )
+    valid_categories = {value for value, _label in categories}
+    workspace_shops = membership.workspace.shops.order_by("name")
     events = AuditEvent.objects.filter(workspace=membership.workspace).select_related(
         "shop", "user"
     )
-    context["activity_page"] = Paginator(events, 25).get_page(request.GET.get("page"))
+    if query:
+        events = events.filter(
+            Q(summary__icontains=query)
+            | Q(action__icontains=query)
+            | Q(user__username__icontains=query)
+            | Q(request_id__icontains=query)
+        )
+    if selected_category in valid_categories:
+        events = events.filter(action__startswith=selected_category)
+    else:
+        selected_category = ""
+    if selected_shop.isdigit() and workspace_shops.filter(id=selected_shop).exists():
+        events = events.filter(shop_id=selected_shop)
+    else:
+        selected_shop = ""
+    filter_params = request.GET.copy()
+    filter_params.pop("page", None)
+    context.update(
+        {
+            "activity_page": Paginator(events, 25).get_page(request.GET.get("page")),
+            "activity_count": events.count(),
+            "activity_actor_count": events.exclude(user=None).values("user_id").distinct().count(),
+            "activity_shop_count": events.exclude(shop=None).values("shop_id").distinct().count(),
+            "latest_activity": events.first(),
+            "activity_query": query,
+            "activity_categories": categories,
+            "selected_activity_category": selected_category,
+            "activity_shops": workspace_shops,
+            "selected_activity_shop": selected_shop,
+            "activity_filter_query": filter_params.urlencode(),
+        }
+    )
     return render(request, "dashboard/activity.html", context)
 
 
@@ -676,18 +925,54 @@ def feedback_inbox(request):
     if not request.user.is_superuser:
         raise PermissionDenied
     context = workspace_context(request)
+    query = request.GET.get("q", "").strip()
     status_filter = request.GET.get("status", "")
+    category_filter = request.GET.get("category", "")
+    rating_filter = request.GET.get("rating", "")
     valid_statuses = {value for value, _label in Feedback.Status.choices}
-    feedback_items = Feedback.objects.select_related("workspace", "shop", "user")
+    valid_categories = {value for value, _label in Feedback.Category.choices}
+    all_feedback = Feedback.objects.select_related("workspace", "shop", "user")
+    feedback_items = all_feedback
+    if query:
+        feedback_items = feedback_items.filter(
+            Q(workspace__name__icontains=query)
+            | Q(shop__name__icontains=query)
+            | Q(user__username__icontains=query)
+            | Q(user__email__icontains=query)
+            | Q(message__icontains=query)
+            | Q(page_path__icontains=query)
+        )
     if status_filter in valid_statuses:
         feedback_items = feedback_items.filter(status=status_filter)
     else:
         status_filter = ""
+    if category_filter in valid_categories:
+        feedback_items = feedback_items.filter(category=category_filter)
+    else:
+        category_filter = ""
+    if rating_filter in {str(value) for value in range(1, 6)}:
+        feedback_items = feedback_items.filter(rating=int(rating_filter))
+    else:
+        rating_filter = ""
+    filter_params = request.GET.copy()
+    filter_params.pop("page", None)
     context.update(
         {
             "feedback_page": Paginator(feedback_items, 25).get_page(request.GET.get("page")),
+            "feedback_match_count": feedback_items.count(),
+            "feedback_total_count": all_feedback.count(),
+            "feedback_new_count": all_feedback.filter(status=Feedback.Status.NEW).count(),
+            "feedback_reviewing_count": all_feedback.filter(status=Feedback.Status.REVIEWING).count(),
+            "feedback_resolved_count": all_feedback.filter(status=Feedback.Status.RESOLVED).count(),
+            "feedback_average_rating": all_feedback.aggregate(value=Avg("rating"))["value"] or 0,
             "feedback_statuses": Feedback.Status.choices,
+            "feedback_categories": Feedback.Category.choices,
+            "feedback_ratings": range(1, 6),
+            "feedback_query": query,
             "status_filter": status_filter,
+            "category_filter": category_filter,
+            "rating_filter": rating_filter,
+            "feedback_filter_query": filter_params.urlencode(),
         }
     )
     return render(request, "dashboard/feedback_inbox.html", context)
@@ -743,10 +1028,23 @@ def update_feedback_status(request, feedback_id):
         messages.success(request, "Feedback status updated.")
     else:
         messages.error(request, "Choose a valid feedback status.")
+    redirect_params = {}
     status_filter = request.POST.get("status_filter", "")
     if status_filter in valid_statuses:
-        return redirect(f"{reverse('feedback_inbox')}?status={status_filter}")
-    return redirect("feedback_inbox")
+        redirect_params["status"] = status_filter
+    category_filter = request.POST.get("category_filter", "")
+    if category_filter in {value for value, _label in Feedback.Category.choices}:
+        redirect_params["category"] = category_filter
+    rating_filter = request.POST.get("rating_filter", "")
+    if rating_filter in {str(value) for value in range(1, 6)}:
+        redirect_params["rating"] = rating_filter
+    query = request.POST.get("q", "").strip()[:200]
+    if query:
+        redirect_params["q"] = query
+    destination = reverse("feedback_inbox")
+    if redirect_params:
+        destination += f"?{urlencode(redirect_params)}"
+    return redirect(destination)
 
 
 @login_required
@@ -754,20 +1052,73 @@ def getting_started(request):
     context = workspace_context(request)
     if not context["membership"]:
         raise PermissionDenied
-    active_shops = context["shops"]
-    has_costs = ProductCost.objects.filter(shop__in=active_shops).exists()
+    active_shops = list(
+        context["membership"].workspace.shops.filter(is_active=True).order_by("name")
+    )
     has_orders = Order.objects.filter(shop__in=active_shops).exists()
+    order_skus = {
+        sku.strip().upper()
+        for sku in OrderItem.objects.filter(order__shop__in=active_shops)
+        .exclude(sku="")
+        .values_list("sku", flat=True)
+    }
+    cost_skus = {
+        sku.strip().upper()
+        for sku in ProductCost.objects.filter(shop__in=active_shops).values_list("sku", flat=True)
+    }
+    missing_cost_skus = order_skus - cost_skus
+    has_complete_costs = bool(order_skus) and not missing_cost_skus
+    has_etsy_connection = EtsyConnection.objects.filter(
+        shop__in=active_shops,
+        is_active=True,
+    ).exists()
     steps = [
-        {"label": "Shop created", "done": bool(active_shops), "url": reverse("shops")},
-        {"label": "Product costs added", "done": has_costs, "url": reverse("product_costs")},
-        {"label": "Orders imported", "done": has_orders, "url": reverse("import_sales")},
+        {
+            "label": "Shop ready",
+            "note": "Add the Etsy shop you want FeeLoom to track.",
+            "done": bool(active_shops),
+            "url": reverse("shops"),
+            "action": "Manage shops",
+        },
+        {
+            "label": "Sales data ready",
+            "note": "Connect Etsy or import an Etsy sales CSV.",
+            "done": has_orders,
+            "url": reverse("import_sales"),
+            "action": "Import sales",
+        },
+        {
+            "label": "Product costs complete",
+            "note": (
+                f"Add costs for {len(missing_cost_skus)} sold SKU{'s' if len(missing_cost_skus) != 1 else ''}."
+                if missing_cost_skus
+                else "Every sold SKU has a product cost."
+                if order_skus
+                else "Import sales first to identify sold SKUs."
+            ),
+            "done": has_complete_costs,
+            "url": reverse("product_costs"),
+            "action": "Add costs",
+        },
+        {
+            "label": "Profit overview ready",
+            "note": "Review real margins after sales and product costs are available.",
+            "done": has_orders and has_complete_costs,
+            "url": reverse("dashboard"),
+            "action": "View overview",
+        },
     ]
+    completed_steps = sum(step["done"] for step in steps)
     context.update(
         {
             "setup_steps": steps,
-            "completed_steps": sum(step["done"] for step in steps),
+            "completed_steps": completed_steps,
             "total_steps": len(steps),
             "setup_complete": all(step["done"] for step in steps),
+            "setup_percent": completed_steps / len(steps) * 100,
+            "next_step": next((step for step in steps if not step["done"]), None),
+            "has_etsy_connection": has_etsy_connection,
+            "missing_cost_count": len(missing_cost_skus),
         }
     )
     return render(request, "dashboard/getting_started.html", context)

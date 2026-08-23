@@ -20,16 +20,31 @@
       </div>
     </section>
     <aside class="form-panel">
-      <h2>Test account email</h2>
-      {% if email_delivery_enabled %}
-        <form method="post" class="stack-form">
-          {% csrf_token %}
-          {{ email_test_form.as_p }}
-          <button class="primary-button" type="submit">Send test email</button>
-        </form>
-      {% else %}
-        <p class="form-note">Add the production SMTP settings in Render before sending a test.</p>
-      {% endif %}
+      <section class="tool-section">
+        <h2>Test account email</h2>
+        {% if email_delivery_enabled %}
+          <form method="post" class="stack-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="email_test">
+            {{ email_test_form.as_p }}
+            <button class="primary-button" type="submit">Send test email</button>
+          </form>
+        {% else %}
+          <p class="form-note">Add the production SMTP settings in Render before sending a test.</p>
+        {% endif %}
+      </section>
+      <section class="tool-section">
+        <h2>Test error monitoring</h2>
+        {% if sentry_enabled %}
+          <form method="post" class="stack-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="sentry_test">
+            <button class="secondary-button" type="submit">Send Sentry test</button>
+          </form>
+        {% else %}
+          <p class="form-note">Add SENTRY_DSN in Render before sending a test.</p>
+        {% endif %}
+      </section>
     </aside>
   </div>
 {% endblock %}

@@ -4,6 +4,7 @@ import logging
 from decimal import Decimal
 from pathlib import Path
 
+import sentry_sdk
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout
@@ -611,8 +612,24 @@ def system_status(request):
     if not request.user.is_superuser:
         raise PermissionDenied
     context = workspace_context(request)
-    form = SystemEmailTestForm(request.POST or None)
-    if request.method == "POST" and form.is_valid():
+    action = request.POST.get("action", "email_test")
+    form = SystemEmailTestForm(request.POST if action == "email_test" else None)
+    if request.method == "POST" and action == "sentry_test":
+        if not settings.SENTRY_DSN:
+            messages.error(request, "Sentry error monitoring is not configured yet.")
+        else:
+            try:
+                sentry_sdk.capture_message(
+                    "FeeLoom production monitoring test",
+                    level="error",
+                )
+                sentry_sdk.flush(timeout=5)
+                messages.success(request, "Sentry test event sent successfully.")
+            except Exception:
+                logger.exception("production_sentry_test_failed")
+                messages.error(request, "The Sentry test event could not be sent.")
+        return redirect("system_status")
+    if request.method == "POST" and action == "email_test" and form.is_valid():
         if not production_email_ready():
             messages.error(request, "Production email delivery is not configured yet.")
         else:
@@ -644,6 +661,7 @@ def system_status(request):
             "readiness_checks": production_checks(),
             "email_test_form": form,
             "email_delivery_enabled": production_email_ready(),
+            "sentry_enabled": bool(settings.SENTRY_DSN),
         }
     )
     return render(request, "dashboard/system_status.html", context)

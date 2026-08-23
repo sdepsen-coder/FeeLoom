@@ -943,3 +943,21 @@ class SystemStatusTests(TestCase):
         self.assertTrue(
             AuditEvent.objects.filter(action="system.email_test_succeeded").exists()
         )
+
+    @override_settings(SENTRY_DSN="https://public-key@sentry.example/1")
+    @patch("dashboard.views.sentry_sdk.flush")
+    @patch("dashboard.views.sentry_sdk.capture_message", return_value="event-id")
+    def test_superuser_can_send_sentry_test(self, capture_message, flush):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("system_status"),
+            {"action": "sentry_test"},
+        )
+
+        self.assertRedirects(response, reverse("system_status"))
+        capture_message.assert_called_once_with(
+            "FeeLoom production monitoring test",
+            level="error",
+        )
+        flush.assert_called_once_with(timeout=5)

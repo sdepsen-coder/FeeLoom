@@ -61,6 +61,7 @@ input:focus,select:focus { outline:3px solid #cce7dc; border-color:var(--green);
 .stack-form .helptext,.stack-form ul { margin:0; color:var(--muted); font-size:12px; } .stack-form .errorlist { color:var(--coral); } .form-note { margin-top:18px; }
 .split-layout { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:24px; align-items:start; }
 .form-panel,.detail-block { padding:20px; border:1px solid var(--line); border-radius:6px; background:var(--panel); }
+.tool-section + .tool-section { margin-top:24px; padding-top:20px; border-top:1px solid var(--line); }
 .detail-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; } .detail-block dl { margin:15px 0 0; }
 .detail-block dl div { display:flex; justify-content:space-between; gap:18px; padding:9px 0; border-bottom:1px solid var(--line); } .detail-block dl div:last-child { border-bottom:0; }
 .detail-block dt { color:var(--muted); } .detail-block dd { margin:0; font-variant-numeric:tabular-nums; font-weight:700; } .detail-block .total { color:var(--ink); font-weight:800; }

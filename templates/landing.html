@@ -6,12 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="FeeLoom shows Etsy sellers the real profit behind every order, product, and shop.">
     <title>FeeLoom | Etsy profit clarity</title>
-    <link rel="stylesheet" href="{% static 'app.css' %}?v=20260823-17">
+    <link rel="stylesheet" href="{% static 'app.css' %}?v=20260826-1">
   </head>
   <body class="landing-page">
     <header class="landing-header">
       <a class="landing-brand" href="{% url 'landing' %}" aria-label="FeeLoom home"><span>F</span><strong>FeeLoom</strong><small>for Etsy sellers</small></a>
-      <nav aria-label="Account">
+      <nav class="landing-site-nav" aria-label="Page sections"><a href="#product">Product</a><a href="#workflow">How it works</a><a href="#beta">Private beta</a></nav>
+      <nav class="landing-account-nav" aria-label="Account">
         {% if request.user.is_authenticated %}
           <a class="landing-login" href="{% url 'dashboard' %}">Open workspace</a>
         {% else %}
@@ -25,22 +26,23 @@
       <section class="landing-hero">
         <div class="hero-grid" aria-hidden="true"></div>
         <div class="hero-product-scene" aria-hidden="true">
-          <div class="scene-top"><span>All shops</span><span>Last 30 days</span></div>
-          <div class="scene-metrics">
-            <div><span>Gross sales</span><strong>$8,420</strong></div>
-            <div><span>Etsy fees</span><strong>$1,176</strong></div>
-            <div class="scene-profit"><span>Net profit</span><strong>$3,248</strong></div>
-            <div><span>Margin</span><strong>38.6%</strong></div>
-          </div>
-          <div class="scene-body">
-            <div class="scene-chart">
-              <span style="--h:42%"></span><span style="--h:68%"></span><span style="--h:51%"></span><span style="--h:77%"></span><span style="--h:58%"></span><span style="--h:88%"></span><span style="--h:72%"></span><span style="--h:96%"></span>
+          <div class="scene-rail"><b>F</b><i></i><i></i><i></i><i></i></div>
+          <div class="scene-canvas">
+            <div class="scene-top"><span><strong>Profit overview</strong><small>All shops</small></span><em>Last 30 days</em></div>
+            <div class="scene-metrics">
+              <div><span>Gross sales</span><strong>$8,420</strong><small>+12.4%</small></div>
+              <div><span>Etsy fees</span><strong>$1,176</strong><small>14.0% of sales</small></div>
+              <div class="scene-profit"><span>Net profit</span><strong>$3,248</strong><small>+$486 this month</small></div>
+              <div><span>Margin</span><strong>38.6%</strong><small>Healthy</small></div>
             </div>
-            <div class="scene-orders">
-              <div><span>Order</span><span>Shop</span><span>Profit</span></div>
-              <div><strong>#1842</strong><span>Luna Forge</span><b>$42.18</b></div>
-              <div><strong>#1841</strong><span>Thread &amp; Timber</span><b>$27.60</b></div>
-              <div><strong>#1840</strong><span>Luna Forge</span><b class="scene-loss">-$3.14</b></div>
+            <div class="scene-body">
+              <div class="scene-chart"><div class="scene-panel-title"><strong>Net profit trend</strong><small>Last 8 periods</small></div><div class="scene-bars"><span style="--h:42%"></span><span style="--h:68%"></span><span style="--h:51%"></span><span style="--h:77%"></span><span style="--h:58%"></span><span style="--h:88%"></span><span style="--h:72%"></span><span style="--h:96%"></span></div></div>
+              <div class="scene-orders">
+                <div><span>Order</span><span>Shop</span><span>Profit</span><span>Status</span></div>
+                <div><strong>#1842</strong><span>Luna Forge</span><b>$42.18</b><em>Healthy</em></div>
+                <div><strong>#1841</strong><span>Thread &amp; Timber</span><b>$27.60</b><em>Healthy</em></div>
+                <div><strong>#1840</strong><span>Luna Forge</span><b class="scene-loss">-$3.14</b><em class="scene-alert">Loss</em></div>
+              </div>
             </div>
           </div>
         </div>
@@ -60,13 +62,34 @@
         </div>
       </section>
 
-      <section class="landing-value" aria-label="FeeLoom capabilities">
-        <div><span>01</span><strong>Every shop, one view</strong><p>Compare stores without rebuilding spreadsheets.</p></div>
-        <div><span>02</span><strong>Profit per order</strong><p>See revenue, Etsy fees, costs, and margin together.</p></div>
-        <div><span>03</span><strong>Find costly leaks</strong><p>Spot losses, low margins, and missing cost data early.</p></div>
+      <section class="landing-signal" aria-label="FeeLoom product signals"><span>One workspace</span><span>Multiple Etsy shops</span><span>Per-order economics</span><span>Export-ready data</span></section>
+
+      <section class="landing-profit-story" id="product">
+        <div class="profit-story-copy"><p class="landing-eyebrow">THE NUMBER ETSY DOESN'T SHOW</p><h2>Revenue looks good.<br>Profit tells the truth.</h2><p>A sale is only the beginning. FeeLoom follows every deduction between the order total and the money you actually keep.</p><div class="profit-story-note"><strong>Nothing hidden in a blended average.</strong><span>Open any order and trace every value behind its margin.</span></div></div>
+        <div class="profit-ledger" aria-label="Example Etsy order profit calculation">
+          <header><div><span>ORDER #1842</span><strong>Hammered silver ring</strong></div><em>Luna Forge</em></header>
+          <dl>
+            <div><dt>Item revenue</dt><dd>$58.00</dd></div>
+            <div><dt>Shipping charged</dt><dd>$4.50</dd></div>
+            <div class="ledger-cost"><dt>Etsy transaction &amp; processing fees</dt><dd>-$7.44</dd></div>
+            <div class="ledger-cost"><dt>Offsite ad fee</dt><dd>-$8.70</dd></div>
+            <div class="ledger-cost"><dt>Product, packaging &amp; shipping cost</dt><dd>-$19.20</dd></div>
+          </dl>
+          <footer><span><small>Real net profit</small><strong>$27.16</strong></span><span><small>Margin</small><strong>43.5%</strong></span><b>Healthy</b></footer>
+        </div>
       </section>
 
-      <section class="landing-workflow">
+      <section class="landing-capabilities" aria-label="Detailed FeeLoom capabilities">
+        <header><p class="landing-eyebrow">BUILT FOR THE REAL WORK</p><h2>One calm workspace for the numbers scattered everywhere else.</h2></header>
+        <div class="capability-list">
+          <article><span>01</span><div><h3>Multi-shop control</h3><p>Switch stores or see the whole business together, without merging spreadsheets by hand.</p></div><strong>All shops</strong></article>
+          <article><span>02</span><div><h3>Complete fee visibility</h3><p>Marketplace fees, ad fees, discounts, refunds, shipping, and costs stay attached to each order.</p></div><strong>Order level</strong></article>
+          <article><span>03</span><div><h3>SKU cost library</h3><p>Maintain product, packaging, handling, and shipping costs once, then apply them consistently.</p></div><strong>Cost aware</strong></article>
+          <article><span>04</span><div><h3>Loss detection</h3><p>Surface low-margin and loss-making sales before they disappear inside total revenue.</p></div><strong>Action ready</strong></article>
+        </div>
+      </section>
+
+      <section class="landing-workflow" id="workflow">
         <header><p class="landing-eyebrow">FROM SALES TO CLARITY</p><h2>Your Etsy numbers, made decision-ready.</h2></header>
         <div class="workflow-steps">
           <div><span>1</span><h3>Bring in sales</h3><p>Import Etsy order data or connect an approved shop.</p></div>
@@ -75,8 +98,8 @@
         </div>
       </section>
 
-      <section class="landing-beta">
-        <div><p class="landing-eyebrow">PRIVATE BETA</p><h2>Built with Etsy sellers, not around them.</h2><p>Early sellers get direct access to the product team and help decide what FeeLoom builds next.</p></div>
+      <section class="landing-beta" id="beta">
+        <div><p class="landing-eyebrow">PRIVATE BETA</p><h2>Built with Etsy sellers, not around them.</h2><p>Early sellers get direct access to the product team, a private feedback channel, and a real say in what FeeLoom builds next.</p><ul><li>Invite-only access</li><li>Your shops stay separated</li><li>Export your data anytime</li></ul></div>
         {% if request.user.is_authenticated %}<a class="landing-primary" href="{% url 'dashboard' %}">Open FeeLoom</a>{% else %}<a class="landing-primary" href="mailto:{{ support_email }}?subject=FeeLoom%20beta%20access">Request access</a>{% endif %}
       </section>
     </main>

@@ -19,6 +19,8 @@ services:
         generateValue: true
       - key: DJANGO_DEBUG
         value: false
+      - key: FEELOOM_PUBLIC_HOSTNAME
+        value: feeloom.app
       - key: FEELOOM_TOKEN_ENCRYPTION_KEY
         generateValue: true
       - key: EMAIL_HOST

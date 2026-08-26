@@ -40,6 +40,15 @@ ALLOWED_HOSTS = [
 RENDER_EXTERNAL_HOSTNAME = os.environ.get("RENDER_EXTERNAL_HOSTNAME", "").strip()
 if RENDER_EXTERNAL_HOSTNAME and RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+FEELOOM_PUBLIC_HOSTNAME = os.environ.get("FEELOOM_PUBLIC_HOSTNAME", "").strip()
+PUBLIC_HOSTNAMES = []
+if FEELOOM_PUBLIC_HOSTNAME:
+    PUBLIC_HOSTNAMES.append(FEELOOM_PUBLIC_HOSTNAME)
+    if not FEELOOM_PUBLIC_HOSTNAME.startswith("www."):
+        PUBLIC_HOSTNAMES.append(f"www.{FEELOOM_PUBLIC_HOSTNAME}")
+for public_hostname in PUBLIC_HOSTNAMES:
+    if public_hostname not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(public_hostname)
 
 
 # Application definition
@@ -156,6 +165,10 @@ if RENDER_EXTERNAL_HOSTNAME:
     render_origin = f"https://{RENDER_EXTERNAL_HOSTNAME}"
     if render_origin not in CSRF_TRUSTED_ORIGINS:
         CSRF_TRUSTED_ORIGINS.append(render_origin)
+for public_hostname in PUBLIC_HOSTNAMES:
+    public_origin = f"https://{public_hostname}"
+    if public_origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(public_origin)
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = not DEBUG
@@ -172,8 +185,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 ETSY_API_KEY = os.environ.get("ETSY_API_KEY", "")
 ETSY_SHARED_SECRET = os.environ.get("ETSY_SHARED_SECRET", "")
 ETSY_REDIRECT_URI = os.environ.get("ETSY_REDIRECT_URI", "")
-if not ETSY_REDIRECT_URI and RENDER_EXTERNAL_HOSTNAME:
-    ETSY_REDIRECT_URI = f"https://{RENDER_EXTERNAL_HOSTNAME}/integrations/etsy/callback/"
+if not ETSY_REDIRECT_URI:
+    callback_hostname = FEELOOM_PUBLIC_HOSTNAME or RENDER_EXTERNAL_HOSTNAME
+    if callback_hostname:
+        ETSY_REDIRECT_URI = f"https://{callback_hostname}/integrations/etsy/callback/"
 FEELOOM_TOKEN_ENCRYPTION_KEY = os.environ.get("FEELOOM_TOKEN_ENCRYPTION_KEY", "")
 FEELOOM_LEGAL_VERSION = "2026-08-21"
 FEELOOM_SUPPORT_EMAIL = os.environ.get("FEELOOM_SUPPORT_EMAIL", "").strip()

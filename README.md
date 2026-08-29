@@ -28,6 +28,10 @@ Set `ETSY_API_KEY`, `ETSY_SHARED_SECRET`, `ETSY_REDIRECT_URI`, and a long random
 Public beta legal pages are available at `/privacy/` and `/terms/`. Set
 `FEELOOM_SUPPORT_EMAIL` to publish a support address on both pages.
 
+Set `GOOGLE_ANALYTICS_MEASUREMENT_ID` to a GA4 Measurement ID when optional
+website analytics are enabled. FeeLoom loads Google Analytics only after a
+visitor accepts the analytics choice.
+
 Password recovery is enabled automatically when `EMAIL_HOST`, `EMAIL_HOST_USER`,
 `EMAIL_HOST_PASSWORD`, and a verified `DEFAULT_FROM_EMAIL` are configured. The
 remaining SMTP settings are listed in `.env.example`.

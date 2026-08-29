@@ -1,0 +1,61 @@
+{% if google_analytics_measurement_id %}
+  <section class="analytics-consent" id="analytics-consent" aria-label="Analytics cookie choice" hidden>
+    <div>
+      <strong>Help us improve FeeLoom</strong>
+      <p>We use optional analytics cookies to understand visits and beta-access interest. No shop or order data is sent to Google. <a href="{% url 'privacy_policy' %}">Privacy Policy</a></p>
+    </div>
+    <div class="analytics-consent-actions">
+      <button class="secondary-button compact" type="button" data-analytics-choice="denied">No thanks</button>
+      <button class="primary-button compact" type="button" data-analytics-choice="granted">Allow analytics</button>
+    </div>
+  </section>
+  <script>
+    (function () {
+      var measurementId = "{{ google_analytics_measurement_id|escapejs }}";
+      var storageKey = "feeloom_analytics_consent";
+      var banner = document.getElementById("analytics-consent");
+
+      function preference() {
+        try { return window.localStorage.getItem(storageKey); } catch (error) { return null; }
+      }
+
+      function loadAnalytics() {
+        if (window.feeLoomAnalyticsLoaded) { return; }
+        window.feeLoomAnalyticsLoaded = true;
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function () { window.dataLayer.push(arguments); };
+        window.gtag("js", new Date());
+        window.gtag("config", measurementId);
+        var script = document.createElement("script");
+        script.async = true;
+        script.src = "https://www.googletagmanager.com/gtag/js?id=" + encodeURIComponent(measurementId);
+        document.head.appendChild(script);
+      }
+
+      function savePreference(value) {
+        try { window.localStorage.setItem(storageKey, value); } catch (error) {}
+        if (banner) { banner.hidden = true; }
+        if (value === "granted") { loadAnalytics(); }
+      }
+
+      var savedPreference = preference();
+      if (savedPreference === "granted") {
+        loadAnalytics();
+      } else if (!savedPreference && banner) {
+        banner.hidden = false;
+      }
+
+      document.querySelectorAll("[data-analytics-choice]").forEach(function (button) {
+        button.addEventListener("click", function () { savePreference(button.dataset.analyticsChoice); });
+      });
+
+      document.addEventListener("click", function (event) {
+        var target = event.target.closest("[data-analytics-event]");
+        if (!target || preference() !== "granted" || !window.gtag) { return; }
+        window.gtag("event", target.dataset.analyticsEvent, {
+          location: target.dataset.analyticsLocation || "unspecified"
+        });
+      });
+    })();
+  </script>
+{% endif %}

@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="FeeLoom shows Etsy sellers the real profit behind every order, product, and shop.">
     <title>FeeLoom | Etsy profit clarity</title>
-    <link rel="stylesheet" href="{% static 'app.css' %}?v=20260826-1">
+    <link rel="stylesheet" href="{% static 'app.css' %}?v=20260829-1">
   </head>
   <body class="landing-page">
     <header class="landing-header">
@@ -55,7 +55,7 @@
               <a class="landing-primary" href="{% url 'dashboard' %}">Open your workspace</a>
             {% else %}
               <a class="landing-primary" href="{% url 'signup' %}">Use your beta invite</a>
-              <a class="landing-secondary" href="mailto:{{ support_email }}?subject=FeeLoom%20beta%20access">Request beta access</a>
+              <a class="landing-secondary" href="mailto:{{ support_email }}?subject=FeeLoom%20beta%20access" data-analytics-event="beta_access_requested" data-analytics-location="hero">Request beta access</a>
             {% endif %}
           </div>
           <p class="landing-proof">Built for multi-shop sellers. CSV import works today. Direct Etsy sync is in beta.</p>
@@ -100,10 +100,11 @@
 
       <section class="landing-beta" id="beta">
         <div><p class="landing-eyebrow">PRIVATE BETA</p><h2>Built with Etsy sellers, not around them.</h2><p>Early sellers get direct access to the product team, a private feedback channel, and a real say in what FeeLoom builds next.</p><ul><li>Invite-only access</li><li>Your shops stay separated</li><li>Export your data anytime</li></ul></div>
-        {% if request.user.is_authenticated %}<a class="landing-primary" href="{% url 'dashboard' %}">Open FeeLoom</a>{% else %}<a class="landing-primary" href="mailto:{{ support_email }}?subject=FeeLoom%20beta%20access">Request access</a>{% endif %}
+        {% if request.user.is_authenticated %}<a class="landing-primary" href="{% url 'dashboard' %}">Open FeeLoom</a>{% else %}<a class="landing-primary" href="mailto:{{ support_email }}?subject=FeeLoom%20beta%20access" data-analytics-event="beta_access_requested" data-analytics-location="private_beta">Request access</a>{% endif %}
       </section>
     </main>
 
     <footer class="landing-footer"><a class="landing-brand" href="{% url 'landing' %}"><span>F</span><strong>FeeLoom</strong></a><p>Clearer profit decisions for Etsy sellers.</p><nav><a href="{% url 'privacy_policy' %}">Privacy</a><a href="{% url 'terms_of_service' %}">Terms</a><a href="mailto:{{ support_email }}">Contact</a></nav></footer>
+    {% include "includes/analytics_consent.html" %}
   </body>
 </html>

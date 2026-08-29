@@ -123,6 +123,19 @@ class DashboardTests(TestCase):
         self.assertContains(response, reverse("signup"))
         self.assertContains(response, reverse("login"))
 
+    @override_settings(GOOGLE_ANALYTICS_MEASUREMENT_ID="G-TEST12345")
+    def test_landing_page_offers_optional_analytics_and_tracks_beta_access(self):
+        response = self.client.get(reverse("landing"))
+
+        self.assertContains(response, "G\\u002DTEST12345")
+        self.assertContains(response, "Allow analytics")
+        self.assertContains(response, 'data-analytics-event="beta_access_requested"')
+
+    def test_landing_page_omits_analytics_when_not_configured(self):
+        response = self.client.get(reverse("landing"))
+
+        self.assertNotContains(response, "feeloom_analytics_consent")
+
     def test_dashboard_remains_private_after_landing_page_is_added(self):
         response = self.client.get(reverse("dashboard"))
 

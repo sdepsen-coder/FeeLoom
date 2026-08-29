@@ -190,9 +190,12 @@ if not ETSY_REDIRECT_URI:
     if callback_hostname:
         ETSY_REDIRECT_URI = f"https://{callback_hostname}/integrations/etsy/callback/"
 FEELOOM_TOKEN_ENCRYPTION_KEY = os.environ.get("FEELOOM_TOKEN_ENCRYPTION_KEY", "")
-FEELOOM_LEGAL_VERSION = "2026-08-21"
+FEELOOM_LEGAL_VERSION = "2026-08-29"
 FEELOOM_SUPPORT_EMAIL = os.environ.get("FEELOOM_SUPPORT_EMAIL", "").strip()
 FEELOOM_BACKUP_READY = os.environ.get("FEELOOM_BACKUP_READY", "false").lower() == "true"
+GOOGLE_ANALYTICS_MEASUREMENT_ID = os.environ.get(
+    "GOOGLE_ANALYTICS_MEASUREMENT_ID", ""
+).strip()
 
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "").strip()
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))

@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}FeeLoom{% endblock %}</title>
-  <link rel="stylesheet" href="{% static 'app.css' %}?v=20260823-17">
+  <link rel="stylesheet" href="{% static 'app.css' %}?v=20260829-1">
   </head>
   <body class="{% if request.user.is_authenticated %}is-authenticated{% else %}is-public{% endif %}">
     <div class="app-shell">
@@ -71,5 +71,6 @@
         document.addEventListener("keydown",function(event){if(event.key==="Escape"){closeNav();}});
       })();
     </script>
+    {% include "includes/analytics_consent.html" %}
   </body>
 </html>
